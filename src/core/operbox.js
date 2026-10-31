@@ -2,7 +2,7 @@ const AMIYA_ID = "char_002_amiya";
 const REQUIRED_KEYS = ["id", "name", "own"];
 
 export function parseOperBox(text, nameIndex) {
-  const data = JSON.parse(text.replace(/^﻿/, ""));
+  const data = JSON.parse(text.replace(/^\uFEFF/, ""));
   if (!Array.isArray(data)) throw new Error("OperBoxは配列である必要があります");
 
   const operators = data.map((item, i) => {

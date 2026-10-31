@@ -31,7 +31,7 @@ function countLayout(layout) {
 }
 
 export function importPlan(text, nameIndex) {
-  const data = JSON.parse(text.replace(/^﻿/, ""));
+  const data = JSON.parse(text.replace(/^\uFEFF/, ""));
   if (!data || !Array.isArray(data.plans)) throw new Error("plans が配列ではありません");
 
   const report = { converted: 0, unresolved: [], dropped: [], warnings: [] };

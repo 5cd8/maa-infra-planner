@@ -19,7 +19,7 @@ const validateSchema = new Ajv({ strict: false, allErrors: true }).compile(schem
 test("実データ: OperBoxの全 name が名前表の name_jp と一致する", { skip }, () => {
   const text = readFileSync(operboxPath, "utf8");
   const box = parseOperBox(text, nameIndex);
-  const raw = JSON.parse(text.replace(/^﻿/, ""));
+  const raw = JSON.parse(text.replace(/^\uFEFF/, ""));
   assert.equal(raw.length, 415);
   assert.equal(raw.filter((o) => o.own).length, 408);
   const missing = raw.filter((o) => nameIndex.idsByJp(o.name).length === 0);
@@ -29,7 +29,7 @@ test("実データ: OperBoxの全 name が名前表の name_jp と一致する",
 
 test("実データ: 参考ファイルの取り込みと書き出し", { skip }, () => {
   const text = readFileSync(refPath, "utf8");
-  const original = JSON.parse(text.replace(/^﻿/, ""));
+  const original = JSON.parse(text.replace(/^\uFEFF/, ""));
   const { project, report } = importPlan(text, nameIndex);
   assert.deepEqual(report.unresolved, []);
   // 回収ステーションを除く63名（Fiammetta.target を含む、延べ件数）

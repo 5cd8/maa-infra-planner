@@ -7,7 +7,7 @@ const kalts = { id: "char_003_kalts", name: "ケルシー", elite: 2, level: 90,
 const amiya3 = { id: "char_1037_amiya3", name: "アーミヤ", elite: 2, level: 80, own: true, potential: 1, rarity: 5 };
 
 test("O1: BOM付きを読める", () => {
-  const box = parseOperBox("﻿" + JSON.stringify([kalts, amiya3]), nameIndex);
+  const box = parseOperBox("\uFEFF" + JSON.stringify([kalts, amiya3]), nameIndex);
   assert.equal(box.operators.length, 2);
 });
 
