@@ -125,7 +125,7 @@ function loadPlan(text) {
 function routeDropped(text) {
   let data;
   try {
-    data = JSON.parse(text.replace(/^﻿/, ""));
+    data = JSON.parse(text.replace(/^\uFEFF/, ""));
   } catch (e) {
     notice(`JSONとして読めませんでした: ${e.message}`);
     return;

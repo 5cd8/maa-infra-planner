@@ -1892,7 +1892,7 @@ dialog::backdrop { background: rgba(0, 0, 0, 0.45); }
   function routeDropped(text) {
     let data;
     try {
-      data = JSON.parse(text.replace(/^﻿/, ""));
+      data = JSON.parse(text.replace(/^\uFEFF/, ""));
     } catch (e) {
       notice(`JSONとして読めませんでした: ${e.message}`);
       return;
