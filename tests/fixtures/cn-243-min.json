@@ -1,0 +1,322 @@
+{
+  "title": "最小版",
+  "description": "テスト用",
+  "layout": [
+    {
+      "type": "control",
+      "level": 3
+    },
+    {
+      "type": "trading",
+      "level": 3
+    },
+    {
+      "type": "trading",
+      "level": 3
+    },
+    {
+      "type": "manufacture",
+      "level": 3
+    },
+    {
+      "type": "manufacture",
+      "level": 3
+    },
+    {
+      "type": "manufacture",
+      "level": 3
+    },
+    {
+      "type": "manufacture",
+      "level": 3
+    },
+    {
+      "type": "power",
+      "level": 3
+    },
+    {
+      "type": "power",
+      "level": 3
+    },
+    {
+      "type": "power",
+      "level": 3
+    },
+    {
+      "type": "meeting",
+      "level": 3
+    },
+    {
+      "type": "processing",
+      "level": 3
+    },
+    {
+      "type": "hire",
+      "level": 3
+    },
+    {
+      "type": "training",
+      "level": 3
+    },
+    {
+      "type": "recycle",
+      "level": 3
+    },
+    {
+      "type": "dormitory",
+      "level": 3
+    },
+    {
+      "type": "dormitory",
+      "level": 3
+    },
+    {
+      "type": "dormitory",
+      "level": 3
+    },
+    {
+      "type": "dormitory",
+      "level": 3
+    }
+  ],
+  "plans": [
+    {
+      "name": "B班",
+      "period": [
+        [
+          "08:00",
+          "10:00"
+        ]
+      ],
+      "drones": {
+        "enable": true,
+        "room": "trading",
+        "index": 1,
+        "rule": "all",
+        "order": "pre"
+      },
+      "Fiammetta": {
+        "enable": true,
+        "target": "但书",
+        "order": "pre"
+      },
+      "rooms": {
+        "control": [
+          {
+            "operators": [
+              "凯尔希"
+            ],
+            "sort": true,
+            "skip": false
+          }
+        ],
+        "trading": [
+          {
+            "operators": [
+              "但书",
+              "空弦",
+              "赫德雷"
+            ],
+            "sort": true,
+            "product": "LMD",
+            "skip": false
+          },
+          {}
+        ],
+        "meeting": [
+          {
+            "operators": [
+              "陈",
+              "红"
+            ],
+            "sort": false,
+            "skip": false
+          }
+        ],
+        "hire": [
+          {}
+        ],
+        "recycle": [
+          {
+            "operators": [
+              "摩根",
+              "森西"
+            ],
+            "sort": false,
+            "skip": false
+          }
+        ],
+        "dormitory": [
+          {
+            "operators": [],
+            "sort": false,
+            "autofill": true,
+            "skip": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "A班",
+      "period": [
+        [
+          "20:00",
+          "22:00"
+        ]
+      ],
+      "drones": {
+        "enable": true,
+        "room": "trading",
+        "index": 1,
+        "rule": "all",
+        "order": "pre"
+      },
+      "Fiammetta": {
+        "enable": true,
+        "target": "但书",
+        "order": "pre"
+      },
+      "rooms": {
+        "control": [
+          {
+            "operators": [
+              "阿米娅"
+            ],
+            "sort": true,
+            "skip": false
+          }
+        ],
+        "trading": [
+          {},
+          {}
+        ],
+        "meeting": [
+          {}
+        ],
+        "hire": [
+          {}
+        ],
+        "recycle": [
+          {
+            "operators": [
+              "摩根"
+            ]
+          }
+        ],
+        "dormitory": [
+          {
+            "autofill": true
+          }
+        ],
+        "processing": [
+          {
+            "operators": [
+              "黍"
+            ],
+            "sort": false,
+            "skip": false
+          }
+        ],
+        "training": [
+          {
+            "operatorsA": [
+              "阿"
+            ],
+            "operatorsB": [
+              "艾丽妮"
+            ],
+            "sort": true,
+            "autofill": true,
+            "skip": false
+          }
+        ]
+      }
+    }
+  ],
+  "operators": [
+    {
+      "id": "char_002_amiya",
+      "name": "阿米娅",
+      "elite": 2,
+      "level": 80,
+      "own": true
+    },
+    {
+      "id": "char_003_kalts",
+      "name": "凯尔希",
+      "elite": 2,
+      "level": 80,
+      "own": true
+    },
+    {
+      "id": "char_010_chen",
+      "name": "陈",
+      "elite": 2,
+      "level": 80,
+      "own": true
+    },
+    {
+      "id": "char_144_red",
+      "name": "红",
+      "elite": 2,
+      "level": 80,
+      "own": true
+    },
+    {
+      "id": "char_4032_provs",
+      "name": "但书",
+      "elite": 2,
+      "level": 80,
+      "own": true
+    },
+    {
+      "id": "char_4088_hodrer",
+      "name": "赫德雷",
+      "elite": 2,
+      "level": 80,
+      "own": true
+    },
+    {
+      "id": "char_332_archet",
+      "name": "空弦",
+      "elite": 2,
+      "level": 80,
+      "own": true
+    },
+    {
+      "id": "char_2025_shu",
+      "name": "黍",
+      "elite": 2,
+      "level": 80,
+      "own": true
+    },
+    {
+      "id": "char_225_haak",
+      "name": "阿",
+      "elite": 2,
+      "level": 80,
+      "own": true
+    },
+    {
+      "id": "char_4009_irene",
+      "name": "艾丽妮",
+      "elite": 2,
+      "level": 80,
+      "own": true
+    },
+    {
+      "id": "char_154_morgan",
+      "name": "摩根",
+      "elite": 2,
+      "level": 80,
+      "own": true
+    },
+    {
+      "id": "char_4143_sensi",
+      "name": "森西",
+      "elite": 2,
+      "level": 80,
+      "own": true
+    }
+  ]
+}

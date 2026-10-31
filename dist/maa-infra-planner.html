@@ -1,0 +1,1922 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MAA 基地スケジュール作成</title>
+<style>
+:root {
+  --bg: #f6f7f9;
+  --panel: #ffffff;
+  --text: #1f2430;
+  --muted: #6a7282;
+  --border: #d5d9e2;
+  --accent: #2f6fdb;
+  --accent-text: #ffffff;
+  --chip: #e8eefb;
+  --error: #c0392b;
+  --warn: #b7791f;
+  --dim: 0.45;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #14171d;
+    --panel: #1d222b;
+    --text: #e6e9ef;
+    --muted: #9aa3b2;
+    --border: #353c49;
+    --accent: #5b92f0;
+    --accent-text: #0e1116;
+    --chip: #2a3550;
+    --error: #ff7b6b;
+    --warn: #e5b45a;
+  }
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 14px/1.5 "Yu Gothic UI", "Meiryo UI", system-ui, sans-serif;
+}
+button, input, select, textarea { font: inherit; color: inherit; }
+button {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 3px 10px;
+  cursor: pointer;
+}
+button.primary { background: var(--accent); color: var(--accent-text); border-color: var(--accent); }
+button:disabled { opacity: 0.5; cursor: default; }
+input[type="text"], select, textarea {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 3px 8px;
+}
+input[type="text"] { min-width: 0; }
+h2, h3 { margin: 0 0 6px; font-size: 15px; }
+h3 { font-size: 14px; }
+
+.layout { display: grid; grid-template-columns: 300px minmax(0, 1fr) 320px; gap: 12px; padding: 12px; align-items: start; }
+@media (max-width: 1100px) { .layout { grid-template-columns: 1fr; } }
+.panel { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 10px; }
+.topbar {
+  display: flex; flex-wrap: wrap; gap: 6px 8px; align-items: center;
+  padding: 10px 12px; background: var(--panel); border-bottom: 1px solid var(--border);
+}
+.topbar .grow { flex: 1 1 180px; }
+.status { color: var(--muted); font-size: 12px; }
+.row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 4px 0; }
+.stack > * { margin-bottom: 8px; }
+.muted { color: var(--muted); font-size: 12px; }
+.drop-active { outline: 3px dashed var(--accent); outline-offset: -6px; }
+
+.plan-item { display: block; width: 100%; text-align: left; margin-bottom: 4px; }
+.plan-item.selected { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+.facility-toggles { display: grid; grid-template-columns: 1fr 1fr; gap: 2px 8px; }
+.period-row input { width: 5.5em; }
+
+.facility-card { margin-bottom: 10px; }
+.rooms { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 8px; }
+.room { border: 1px solid var(--border); border-radius: 6px; padding: 6px 8px; }
+.room.flash { outline: 2px solid var(--accent); }
+.chips { display: flex; flex-direction: column; gap: 3px; margin: 4px 0; }
+.chip { display: flex; align-items: center; gap: 4px; background: var(--chip); border-radius: 6px; padding: 1px 4px 1px 8px; }
+.chip .name { flex: 1; }
+.chip button { padding: 0 6px; line-height: 1.3; }
+.unresolved .name { color: var(--warn); }
+.checks { display: flex; flex-wrap: wrap; gap: 2px 10px; }
+.disabled { opacity: 0.5; }
+
+.issue { display: block; width: 100%; text-align: left; margin-bottom: 4px; border-left: 4px solid var(--border); }
+.issue.error { border-left-color: var(--error); }
+.issue.warn { border-left-color: var(--warn); }
+.badge { display: inline-block; border-radius: 10px; padding: 0 8px; margin-right: 4px; font-size: 12px; border: 1px solid var(--border); }
+.badge.error { color: var(--error); border-color: var(--error); }
+.badge.warn { color: var(--warn); border-color: var(--warn); }
+
+dialog { background: var(--panel); color: var(--text); border: 1px solid var(--border); border-radius: 10px; padding: 14px; max-width: min(640px, 94vw); width: 94vw; }
+dialog::backdrop { background: rgba(0, 0, 0, 0.45); }
+.picker-list { max-height: 50vh; overflow: auto; margin: 8px 0; border: 1px solid var(--border); border-radius: 6px; }
+.pick-row { display: grid; grid-template-columns: 1fr auto auto auto; gap: 8px; width: 100%; text-align: left; border: 0; border-bottom: 1px solid var(--border); border-radius: 0; background: transparent; }
+.pick-row.taken { opacity: var(--dim); }
+.tag { font-size: 11px; border: 1px solid var(--border); border-radius: 8px; padding: 0 6px; color: var(--muted); }
+.dialog-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 10px; }
+.report ul { margin: 2px 0 8px; padding-left: 20px; max-height: 20vh; overflow: auto; }
+
+</style>
+</head>
+<body>
+<div id="app"></div>
+<dialog id="dialog"></dialog>
+<script type="application/json" id="names">{
+  "source": "MAA v6.20.1 d94dd00",
+  "chars": [
+    ["char_002_amiya", "阿米娅", "アーミヤ", 5, true],
+    ["char_003_kalts", "凯尔希", "ケルシー", 6, true],
+    ["char_009_12fce", "12F", "12F", 2, true],
+    ["char_010_chen", "陈", "チェン", 6, true],
+    ["char_017_huang", "煌", "ブレイズ", 6, true],
+    ["char_1001_amiya2", "阿米娅", "アーミヤ", 5, true],
+    ["char_1011_lava2", "炎狱炎熔", "炎獄ラヴァ", 5, true],
+    ["char_1012_skadi2", "浊心斯卡蒂", "濁心スカジ", 6, true],
+    ["char_1013_chen2", "假日威龙陈", "遊龍チェン", 6, true],
+    ["char_1014_nearl2", "耀骑士临光", "耀騎士ニアール", 6, true],
+    ["char_1015_aglna2", "予愿安洁莉娜", "予愿安洁莉娜", 6, false],
+    ["char_1016_agoat2", "纯烬艾雅法拉", "純燼エイヤフィヤトラ", 6, true],
+    ["char_1019_siege2", "维娜·维多利亚", "ヴィーナ・ヴィクトリア", 6, true],
+    ["char_101_sora", "空", "ソラ", 5, true],
+    ["char_1020_reed2", "焰影苇草", "焔影リード", 6, true],
+    ["char_1021_kroos2", "寒芒克洛丝", "寒芒クルース", 5, true],
+    ["char_1022_flwr2", "撷英调香师", "萃香パフューマー", 5, true],
+    ["char_1023_ghost2", "归溟幽灵鲨", "帰溟スペクター", 6, true],
+    ["char_1024_hbisc2", "濯尘芙蓉", "濯塵ハイビスカス", 5, true],
+    ["char_1026_gvial2", "百炼嘉维尔", "百錬ガヴィル", 6, true],
+    ["char_1027_greyy2", "承曦格雷伊", "承曦グレイ", 5, true],
+    ["char_1028_texas2", "缄默德克萨斯", "血掟テキサス", 6, true],
+    ["char_1029_yato2", "麒麟R夜刀", "キリンRヤトウ", 6, true],
+    ["char_102_texas", "德克萨斯", "テキサス", 5, true],
+    ["char_1030_noirc2", "火龙S黑角", "レウスSノイルホーン", 5, true],
+    ["char_1031_slent2", "淬羽赫默", "淬羽サイレンス", 6, true],
+    ["char_1032_excu2", "圣约送葬人", "聖約イグゼキュター", 6, true],
+    ["char_1033_swire2", "琳琅诗怀雅", "琳琅スワイヤー", 6, true],
+    ["char_1034_jesca2", "涤火杰西卡", "滌火ジェシカ", 6, true],
+    ["char_1035_wisdel", "维什戴尔", "ウィシャデル", 6, true],
+    ["char_1036_fang2", "历阵锐枪芬", "歴陣鋭槍フェン", 5, true],
+    ["char_1037_amiya3", "阿米娅", "アーミヤ", 5, true],
+    ["char_1038_whitw2", "荒芜拉普兰德", "荒蕪ラップランド", 6, true],
+    ["char_1039_thorn2", "引星棘刺", "引星ソーンズ", 6, true],
+    ["char_103_angel", "能天使", "エクシア", 6, true],
+    ["char_1040_blaze2", "烛煌", "熾炎ブレイズ", 6, true],
+    ["char_1041_angel2", "新约能天使", "新約エクシア", 6, true],
+    ["char_1042_phatm2", "酒神", "トラゴーディア", 6, true],
+    ["char_1043_leizi2", "司霆惊蛰", "司霆レイズ", 6, true],
+    ["char_1044_hsgma2", "斩业星熊", "斬業ホシグマ", 6, true],
+    ["char_1045_svash2", "凛御银灰", "凛御シルバーアッシュ", 6, true],
+    ["char_1046_sbell2", "圣聆初雪", "聖聆プラマニクス", 6, true],
+    ["char_1047_halo2", "溯光星源", "溯光アステジーニ", 6, true],
+    ["char_1048_orchd2", "焰狐龙梓兰", "焰狐龙梓兰", 6, false],
+    ["char_1049_catap2", "雷狼龙S空爆", "雷狼龙S空爆", 5, false],
+    ["char_1050_chen3", "赤刃明霄陈", "赤刃明霄チェン", 6, true],
+    ["char_1051_headb2", "怒潮凛冬", "怒潮ズィマー", 6, true],
+    ["char_1052_kalts2", "凯尔希·思衡托", "ケルシー・エスペランタ", 6, true],
+    ["char_106_franka", "芙兰卡", "フランカ", 5, true],
+    ["char_107_liskam", "雷蛇", "リスカム", 5, true],
+    ["char_108_silent", "赫默", "サイレンス", 5, true],
+    ["char_109_fmout", "远山", "ギターノ", 4, true],
+    ["char_110_deepcl", "深海色", "ディピカ", 4, true],
+    ["char_112_siege", "推进之王", "シージ", 6, true],
+    ["char_113_cqbw", "W", "W", 6, true],
+    ["char_115_headbr", "凛冬", "ズィマー", 5, true],
+    ["char_117_myrrh", "末药", "ミルラ", 4, true],
+    ["char_118_yuki", "白雪", "シラユキ", 4, true],
+    ["char_120_hibisc", "芙蓉", "ハイビスカス", 3, true],
+    ["char_121_lava", "炎熔", "ラヴァ", 3, true],
+    ["char_122_beagle", "米格鲁", "ビーグル", 3, true],
+    ["char_123_fang", "芬", "フェン", 3, true],
+    ["char_124_kroos", "克洛丝", "クルース", 3, true],
+    ["char_126_shotst", "流星", "メテオ", 4, true],
+    ["char_127_estell", "艾丝黛尔", "エステル", 4, true],
+    ["char_128_plosis", "白面鸮", "フィリオプシス", 5, true],
+    ["char_129_bluep", "蓝毒", "アズリウス", 5, true],
+    ["char_130_doberm", "杜宾", "ドーベルマン", 4, true],
+    ["char_131_flameb", "炎客", "エンカク", 5, true],
+    ["char_133_mm", "梅", "メイ", 4, true],
+    ["char_134_ifrit", "伊芙利特", "イフリータ", 6, true],
+    ["char_135_halo", "星源", "アステジーニ", 5, true],
+    ["char_136_hsguma", "星熊", "ホシグマ", 6, true],
+    ["char_137_brownb", "猎蜂", "ビーハンター", 4, true],
+    ["char_140_whitew", "拉普兰德", "ラップランド", 5, true],
+    ["char_141_nights", "夜烟", "ヘイズ", 4, true],
+    ["char_143_ghost", "幽灵鲨", "スペクター", 5, true],
+    ["char_144_red", "红", "レッド", 5, true],
+    ["char_145_prove", "普罗旺斯", "プロヴァンス", 5, true],
+    ["char_147_shining", "闪灵", "シャイニング", 6, true],
+    ["char_148_nearl", "临光", "ニアール", 5, true],
+    ["char_149_scave", "清道夫", "スカベンジャー", 4, true],
+    ["char_1502_crosly", "弑君者", "クラウンスレイヤー", 6, true],
+    ["char_150_snakek", "蛇屠箱", "クオーラ", 4, true],
+    ["char_151_myrtle", "桃金娘", "テンニンカ", 4, true],
+    ["char_154_morgan", "摩根", "モーガン", 5, true],
+    ["char_155_tiger", "因陀罗", "インドラ", 5, true],
+    ["char_157_dagda", "达格达", "ダグザ", 5, true],
+    ["char_158_milu", "守林人", "ファイヤーウォッチ", 5, true],
+    ["char_159_peacok", "断罪者", "コンビクション", 4, true],
+    ["char_163_hpsts", "火神", "ヴァルカン", 5, true],
+    ["char_164_nightm", "夜魔", "ナイトメア", 5, true],
+    ["char_166_skfire", "天火", "スカイフレア", 5, true],
+    ["char_171_bldsk", "华法琳", "ワルファリン", 5, true],
+    ["char_172_svrash", "银灰", "シルバーアッシュ", 6, true],
+    ["char_173_slchan", "崖心", "クリフハート", 5, true],
+    ["char_174_slbell", "初雪", "プラマニクス", 5, true],
+    ["char_179_cgbird", "夜莺", "ナイチンゲール", 6, true],
+    ["char_180_amgoat", "艾雅法拉", "エイヤフィヤトラ", 6, true],
+    ["char_181_flower", "调香师", "パフューマー", 4, true],
+    ["char_183_skgoat", "地灵", "アーススピリット", 4, true],
+    ["char_185_frncat", "慕斯", "ムース", 4, true],
+    ["char_187_ccheal", "嘉维尔", "ガヴィル", 4, true],
+    ["char_188_helage", "赫拉格", "ヘラグ", 6, true],
+    ["char_190_clour", "红云", "ヴァーミル", 4, true],
+    ["char_192_falco", "翎羽", "プリュム", 3, true],
+    ["char_193_frostl", "霜叶", "フロストリーフ", 4, true],
+    ["char_194_leto", "烈夏", "リェータ", 5, true],
+    ["char_195_glassb", "真理", "イースチナ", 5, true],
+    ["char_196_sunbr", "古米", "グム", 4, true],
+    ["char_197_poca", "早露", "ロサ", 6, true],
+    ["char_198_blackd", "讯使", "クーリエ", 4, true],
+    ["char_199_yak", "角峰", "マッターホルン", 4, true],
+    ["char_2012_typhon", "提丰", "ティフォン", 6, true],
+    ["char_2013_cerber", "刻俄柏", "ケオベ", 6, true],
+    ["char_2014_nian", "年", "ニェン", 6, true],
+    ["char_2015_dusk", "夕", "シー", 6, true],
+    ["char_201_moeshd", "可颂", "クロワッサン", 5, true],
+    ["char_2023_ling", "令", "リィン", 6, true],
+    ["char_2024_chyue", "重岳", "チョンユエ", 6, true],
+    ["char_2025_shu", "黍", "シュウ", 6, true],
+    ["char_2026_yu", "余", "ユー", 6, true],
+    ["char_2027_wang", "望", "ウァン", 6, true],
+    ["char_202_demkni", "塞雷娅", "サリア", 6, true],
+    ["char_204_platnm", "白金", "プラチナ", 5, true],
+    ["char_206_gnosis", "灵知", "ノーシス", 6, true],
+    ["char_208_melan", "玫兰莎", "メランサ", 3, true],
+    ["char_209_ardign", "卡缇", "カーディ", 3, true],
+    ["char_210_stward", "史都华德", "スチュワード", 3, true],
+    ["char_211_adnach", "安德切尔", "アドナキエル", 3, true],
+    ["char_212_ansel", "安赛尔", "アンセル", 3, true],
+    ["char_213_mostma", "莫斯提马", "モスティマ", 6, true],
+    ["char_214_kafka", "卡夫卡", "カフカ", 5, true],
+    ["char_215_mantic", "狮蝎", "マンティコア", 5, true],
+    ["char_218_cuttle", "安哲拉", "アンドレアナ", 5, true],
+    ["char_219_meteo", "陨星", "メテオリーテ", 5, true],
+    ["char_220_grani", "格拉尼", "グラニ", 5, true],
+    ["char_222_bpipe", "风笛", "バグパイプ", 6, true],
+    ["char_225_haak", "阿", "ア", 6, true],
+    ["char_226_hmau", "吽", "ウン", 5, true],
+    ["char_230_savage", "暴行", "サベージ", 5, true],
+    ["char_235_jesica", "杰西卡", "ジェシカ", 4, true],
+    ["char_236_rope", "暗索", "ロープ", 4, true],
+    ["char_237_gravel", "砾", "グラベル", 4, true],
+    ["char_240_wyvern", "香草", "バニラ", 3, true],
+    ["char_241_panda", "食铁兽", "エフイーター", 5, true],
+    ["char_242_otter", "梅尔", "メイヤー", 5, true],
+    ["char_243_waaifu", "槐琥", "ワイフー", 5, true],
+    ["char_245_cello", "塑心", "ヴィルトゥオーサ", 6, true],
+    ["char_248_mgllan", "麦哲伦", "マゼラン", 6, true],
+    ["char_249_mlyss", "缪尔赛思", "ミュルジス", 6, true],
+    ["char_250_phatom", "傀影", "ファントム", 6, true],
+    ["char_252_bibeak", "柏喙", "バイビーク", 5, true],
+    ["char_253_greyy", "格雷伊", "グレイ", 4, true],
+    ["char_254_vodfox", "巫恋", "シャマレ", 5, true],
+    ["char_258_podego", "波登可", "ポデンコ", 4, true],
+    ["char_260_durnar", "坚雷", "ジュナー", 4, true],
+    ["char_261_sddrag", "苇草", "リード", 5, true],
+    ["char_263_skadi", "斯卡蒂", "スカジ", 6, true],
+    ["char_264_f12yin", "山", "マウンテン", 6, true],
+    ["char_265_sophia", "鞭刃", "ウィスラッシュ", 5, true],
+    ["char_271_spikes", "芳汀", "アレーン", 4, true],
+    ["char_272_strong", "孑", "ジェイ", 4, true],
+    ["char_274_astesi", "星极", "アステシア", 5, true],
+    ["char_275_breeze", "微风", "ブリーズ", 5, true],
+    ["char_277_sqrrel", "阿消", "ショウ", 4, true],
+    ["char_278_orchid", "梓兰", "オーキッド", 3, true],
+    ["char_279_excu", "送葬人", "イグゼキュター", 5, true],
+    ["char_281_popka", "泡普卡", "ポプカル", 3, true],
+    ["char_282_catap", "空爆", "カタパルト", 3, true],
+    ["char_283_midn", "月见夜", "ミッドナイト", 3, true],
+    ["char_284_spot", "斑点", "スポット", 3, true],
+    ["char_285_medic2", "Lancet-2", "Lancet-2", 1, true],
+    ["char_286_cast3", "Castle-3", "Castle-3", 1, true],
+    ["char_289_gyuki", "缠丸", "マトイマル", 4, true],
+    ["char_290_vigna", "红豆", "ヴィグナ", 4, true],
+    ["char_291_aglina", "安洁莉娜", "アンジェリーナ", 6, true],
+    ["char_293_thorns", "棘刺", "ソーンズ", 6, true],
+    ["char_294_ayer", "断崖", "エアースカーペ", 5, true],
+    ["char_297_hamoni", "和弦", "ハーモニー", 5, true],
+    ["char_298_susuro", "苏苏洛", "ススーロ", 4, true],
+    ["char_300_phenxi", "菲亚梅塔", "フィアメッタ", 6, true],
+    ["char_301_cutter", "刻刀", "カッター", 4, true],
+    ["char_302_glaze", "安比尔", "アンブリエル", 4, true],
+    ["char_304_zebra", "暴雨", "ヘビーレイン", 5, true],
+    ["char_306_leizi", "惊蛰", "レイズ", 5, true],
+    ["char_308_swire", "诗怀雅", "スワイヤー", 5, true],
+    ["char_311_mudrok", "泥岩", "マドロック", 6, true],
+    ["char_322_lmlee", "老鲤", "リー", 6, true],
+    ["char_325_bison", "拜松", "バイソン", 5, true],
+    ["char_326_glacus", "格劳克斯", "グラウコス", 5, true],
+    ["char_328_cammou", "卡达", "カシャ", 4, true],
+    ["char_332_archet", "空弦", "アルケット", 6, true],
+    ["char_333_sidero", "铸铁", "シデロカ", 5, true],
+    ["char_336_folivo", "稀音", "シーン", 5, true],
+    ["char_337_utage", "宴", "ウタゲ", 4, true],
+    ["char_338_iris", "爱丽丝", "アイリス", 5, true],
+    ["char_340_shwaz", "黑", "シュヴァルツ", 6, true],
+    ["char_341_sntlla", "寒檀", "サンタラ", 5, true],
+    ["char_343_tknogi", "月禾", "ツキノギ", 5, true],
+    ["char_344_beewax", "蜜蜡", "ビーズワクス", 5, true],
+    ["char_345_folnic", "亚叶", "フォリニック", 5, true],
+    ["char_346_aosta", "奥斯塔", "アオスタ", 5, true],
+    ["char_347_jaksel", "杰克", "ジャッキー", 4, true],
+    ["char_348_ceylon", "锡兰", "セイロン", 5, true],
+    ["char_349_chiave", "贾维", "キアーベ", 5, true],
+    ["char_350_surtr", "史尔特尔", "スルト", 6, true],
+    ["char_355_ethan", "伊桑", "イーサン", 4, true],
+    ["char_356_broca", "布洛卡", "ブローカ", 5, true],
+    ["char_358_lisa", "铃兰", "スズラン", 6, true],
+    ["char_362_saga", "嵯峨", "サガ", 6, true],
+    ["char_363_toddi", "熔泉", "トギフォンス", 5, true],
+    ["char_365_aprl", "四月", "エイプリル", 5, true],
+    ["char_366_acdrop", "酸糖", "アシッドドロップ", 4, true],
+    ["char_367_swllow", "灰喉", "グレースロート", 5, true],
+    ["char_369_bena", "贝娜", "ベナ", 5, true],
+    ["char_373_lionhd", "莱恩哈特", "レオンハルト", 5, true],
+    ["char_376_therex", "THRM-EX", "THRM-EX", 1, true],
+    ["char_377_gdglow", "澄闪", "ゴールデングロー", 6, true],
+    ["char_378_asbest", "石棉", "アスベストス", 5, true],
+    ["char_379_sesa", "慑砂", "シェーシャ", 5, true],
+    ["char_381_bubble", "泡泡", "バブル", 4, true],
+    ["char_383_snsant", "雪雉", "スノーズント", 5, true],
+    ["char_385_finlpp", "清流", "セイリュウ", 4, true],
+    ["char_388_mint", "薄绿", "ミント", 5, true],
+    ["char_391_rosmon", "迷迭香", "ロスモンティス", 6, true],
+    ["char_393_toledo", "德·托莱多", "德·托莱多", 5, false],
+    ["char_394_hadiya", "哈蒂娅", "ハディヤ", 5, true],
+    ["char_4000_jnight", "正义骑士号", "ジャスティスナイト", 1, true],
+    ["char_4004_pudd", "布丁", "プリン", 4, true],
+    ["char_4006_melnte", "玫拉", "メラナイト", 5, true],
+    ["char_4009_irene", "艾丽妮", "アイリーニ", 6, true],
+    ["char_400_weedy", "温蒂", "ウィーディ", 6, true],
+    ["char_4010_etlchi", "隐德来希", "エンテレケイア", 6, true],
+    ["char_4011_lessng", "止颂", "レッシング", 6, true],
+    ["char_4013_kjera", "耶拉", "イェラ", 5, true],
+    ["char_4014_lunacu", "子月", "ルナカブ", 5, true],
+    ["char_4015_spuria", "空构", "スプリア", 5, true],
+    ["char_4016_kazema", "风丸", "カゼマル", 5, true],
+    ["char_4017_puzzle", "谜图", "パズル", 5, true],
+    ["char_4019_ncdeer", "九色鹿", "九色鹿", 5, true],
+    ["char_401_elysm", "极境", "エリジウム", 5, true],
+    ["char_4023_rfalcn", "红隼", "ケストレル", 5, true],
+    ["char_4025_aprot2", "暮落", "シャレム", 5, true],
+    ["char_4026_vulpis", "忍冬", "ウルピスフォリア", 6, true],
+    ["char_4027_heyak", "霍尔海雅", "ホルハイヤ", 6, true],
+    ["char_402_tuye", "图耶", "トゥイエ", 5, true],
+    ["char_4031_liesel", "复奏", "リプレーザ", 5, true],
+    ["char_4032_provs", "但书", "プロヴァイゾ", 5, true],
+    ["char_4036_forcer", "见行者", "エンフォーサー", 5, true],
+    ["char_4037_demetr", "贝洛内", "ベッローネ", 6, true],
+    ["char_4039_horn", "号角", "ホルン", 6, true],
+    ["char_4040_rockr", "洛洛", "ロックロック", 5, true],
+    ["char_4041_chnut", "褐果", "チェストナット", 4, true],
+    ["char_4042_lumen", "流明", "ルーメン", 6, true],
+    ["char_4043_erato", "埃拉托", "エラト", 5, true],
+    ["char_4045_heidi", "海蒂", "ハイディ", 5, true],
+    ["char_4046_ebnhlz", "黑键", "エーベンホルツ", 6, true],
+    ["char_4047_pianst", "车尔尼", "ツェルニー", 5, true],
+    ["char_4048_doroth", "多萝西", "ドロシー", 6, true],
+    ["char_4051_akkord", "协律", "アコルト", 4, true],
+    ["char_4052_surfer", "寻澜", "サーファー", 5, true],
+    ["char_4054_malist", "至简", "ミニマリスト", 5, true],
+    ["char_4055_bgsnow", "鸿雪", "パゼオンカ", 6, true],
+    ["char_4056_titi", "缇缇", "ティティ", 6, true],
+    ["char_4058_pepe", "佩佩", "ペペ", 6, true],
+    ["char_405_absin", "苦艾", "アブサント", 5, true],
+    ["char_4062_totter", "铅踝", "トター", 4, true],
+    ["char_4063_quartz", "石英", "クォーツ", 4, true],
+    ["char_4064_mlynar", "玛恩纳", "ムリナール", 6, true],
+    ["char_4065_judge", "斥罪", "ペナンス", 6, true],
+    ["char_4066_highmo", "海沫", "ハイモア", 5, true],
+    ["char_4067_lolxh", "罗小黑", "羅小黒", 4, true],
+    ["char_4071_peper", "明椒", "パプリカ", 5, true],
+    ["char_4072_ironmn", "白铁", "ステインレス", 6, true],
+    ["char_4077_palico", "泰拉大陆调查团", "テラ大陸調査団", 1, true],
+    ["char_4078_bdhkgt", "截云", "ジエユン", 5, true],
+    ["char_4079_haini", "海霓", "ルシーラ", 5, true],
+    ["char_4080_lin", "林", "リン", 6, true],
+    ["char_4081_warmy", "温米", "ウォーミー", 5, true],
+    ["char_4082_qiubai", "仇白", "チューバイ", 6, true],
+    ["char_4083_chimes", "铎铃", "ウィンドチャイム", 5, true],
+    ["char_4087_ines", "伊内丝", "イネス", 6, true],
+    ["char_4088_hodrer", "赫德雷", "ヘドリー", 6, true],
+    ["char_4091_ulika", "U-Official", "U-Official", 1, true],
+    ["char_4093_frston", "Friston-3", "Friston-3", 1, true],
+    ["char_4098_vvana", "薇薇安娜", "ヴィヴィアナ", 6, true],
+    ["char_4100_caper", "跃跃", "ケイパー", 4, true],
+    ["char_4102_threye", "凛视", "ヴァラルクビン", 5, true],
+    ["char_4104_coldst", "冰酿", "コールドショット", 5, true],
+    ["char_4105_almond", "杏仁", "アーモンド", 5, true],
+    ["char_4106_bryota", "苍苔", "ブライオファイタ", 5, true],
+    ["char_4107_vrdant", "维荻", "ヴァーダント", 4, true],
+    ["char_4109_baslin", "深律", "ベースライン", 5, true],
+    ["char_4110_delphn", "戴菲恩", "デルフィーン", 5, true],
+    ["char_4114_harold", "哈洛德", "ハロルド", 5, true],
+    ["char_4116_blkkgt", "锏", "デーゲンブレヒャー", 6, true],
+    ["char_4117_ray", "莱伊", "レイ", 6, true],
+    ["char_4119_wanqin", "万顷", "ワンチィン", 5, true],
+    ["char_411_tomimi", "特米米", "トミミ", 5, true],
+    ["char_4121_zuole", "左乐", "ズオ・ラウ", 6, true],
+    ["char_4122_grabds", "小满", "グレインバッズ", 5, true],
+    ["char_4123_ela", "艾拉", "Ela", 6, true],
+    ["char_4124_iana", "双月", "Iana", 5, true],
+    ["char_4125_rdoc", "医生", "Doc", 5, true],
+    ["char_4126_fuze", "导火索", "Fuze", 5, true],
+    ["char_4130_luton", "露托", "ルトナダ", 4, true],
+    ["char_4131_odda", "奥达", "オッダ", 5, true],
+    ["char_4132_ascln", "阿斯卡纶", "アスカロン", 6, true],
+    ["char_4133_logos", "逻各斯", "ロゴス", 6, true],
+    ["char_4134_cetsyr", "魔王", "シヴィライト・エテルナ", 6, true],
+    ["char_4136_phonor", "PhonoR-0", "PhonoR-0", 1, true],
+    ["char_4137_udflow", "深巡", "アンダーフロー", 5, true],
+    ["char_4138_narant", "娜仁图亚", "ナラントゥヤ", 6, true],
+    ["char_4139_papyrs", "莎草", "パピルス", 5, true],
+    ["char_4140_lasher", "衡沙", "サンドレコナー", 5, true],
+    ["char_4141_marcil", "玛露西尔", "マルシル", 6, true],
+    ["char_4142_laios", "莱欧斯", "ライオス", 5, true],
+    ["char_4143_sensi", "森西", "センシ", 5, true],
+    ["char_4144_chilc", "齐尔查克", "チルチャック", 5, true],
+    ["char_4145_ulpia", "乌尔比安", "ウルピアヌス", 6, true],
+    ["char_4146_nymph", "妮芙", "ニンフ", 6, true],
+    ["char_4147_mitm", "渡桥", "ミトム", 5, true],
+    ["char_4148_philae", "菲莱", "フィラエ", 5, true],
+    ["char_4151_tinman", "锡人", "ブリキ", 5, true],
+    ["char_4155_talr", "裁度", "フィグリーノ", 5, true],
+    ["char_415_flint", "燧石", "フリント", 5, true],
+    ["char_4162_cathy", "凯瑟琳", "キャサリン", 5, true],
+    ["char_4163_rosesa", "瑰盐", "ローズソルト", 5, true],
+    ["char_4164_tecno", "特克诺", "テクノ", 5, true],
+    ["char_4165_ctrail", "云迹", "コントレイル", 4, true],
+    ["char_4166_varkis", "摆渡人", "ヴァルカリス", 5, true],
+    ["char_416_zumama", "森蚺", "ユーネクテス", 6, true],
+    ["char_4171_wulfen", "钼铅", "ウルフェナイト", 5, true],
+    ["char_4172_xingzh", "行箸", "シィンズゥ", 5, true],
+    ["char_4173_nowell", "诺威尔", "ノウエル", 5, true],
+    ["char_4177_brigid", "水灯心", "ブリギッド", 5, true],
+    ["char_4178_alanna", "阿兰娜", "アランナ", 5, true],
+    ["char_4179_monstr", "Mon3tr", "Mon3tr", 6, true],
+    ["char_4182_oblvns", "丰川祥子", "豊川祥子", 6, true],
+    ["char_4183_mortis", "若叶睦", "若葉睦", 5, true],
+    ["char_4184_dolris", "三角初华", "三角初華", 5, true],
+    ["char_4185_amoris", "祐天寺若麦", "祐天寺にゃむ", 5, true],
+    ["char_4186_tmoris", "八幡海铃", "八幡海鈴", 5, true],
+    ["char_4187_graceb", "聆音", "グレースベアラー", 5, true],
+    ["char_4188_confes", "CONFESS-47", "CONFESS-47", 1, true],
+    ["char_4191_tippi", "蒂比", "ティッピ", 5, true],
+    ["char_4193_lemuen", "蕾缪安", "レミュアン", 6, true],
+    ["char_4194_rmixer", "信仰搅拌机", "サンクタ・ミキサー", 6, true],
+    ["char_4195_radian", "电弧", "レイディアン", 6, true],
+    ["char_4196_reckpr", "录武官", "レコードキーパー", 5, true],
+    ["char_4198_christ", "Miss.Christine", "ミス・クリスティーン", 5, true],
+    ["char_4199_makiri", "松桐", "マツキリ", 5, true],
+    ["char_4202_haruka", "遥", "ハルカ", 6, true],
+    ["char_4203_kichi", "吉星", "キチセイ", 5, true],
+    ["char_4204_mantra", "真言", "マントラ", 6, true],
+    ["char_4207_branch", "折桠", "ヴェトチキ", 5, true],
+    ["char_4208_wintim", "冬时", "スネグーラチカ", 4, true],
+    ["char_420_flamtl", "焰尾", "フレイムテイル", 6, true],
+    ["char_4211_snhunt", "雪猎", "スノーハンター", 5, true],
+    ["char_4212_nasti", "娜斯提", "ナスティ", 6, true],
+    ["char_4213_skybx", "天空盒", "スカイボックス", 5, true],
+    ["char_4214_cairn", "响石", "ケルン", 5, true],
+    ["char_4215_buddy", "罗德岛隐秘队", "罗德岛隐秘队", 1, false],
+    ["char_4217_makoto", "结城理", "结城理", 6, false],
+    ["char_4218_aigis", "埃癸斯", "埃癸斯", 5, false],
+    ["char_4219_yukari", "岳羽由加莉", "岳羽由加莉", 5, false],
+    ["char_421_crow", "羽毛笔", "ラ・プルマ", 5, true],
+    ["char_4220_kormr", "虎狼丸", "虎狼丸", 1, false],
+    ["char_4221_ju", "矩", "ジュー", 5, true],
+    ["char_4222_taraxa", "风絮", "タラクサカム", 5, true],
+    ["char_4223_botany", "伯塔尼", "ボタニ", 5, true],
+    ["char_4224_turdus", "乌啾", "ウクシク", 5, true],
+    ["char_4225_tanya", "裂响", "クラックボーン", 5, true],
+    ["char_4226_veen", "维伊", "ヴィイ", 6, true],
+    ["char_4227_gallus", "GALLUS²", "GALLUS²", 1, true],
+    ["char_4228_closur", "可露希尔", "クロージャ", 6, true],
+    ["char_4229_aphris", "谬因", "谬因", 6, false],
+    ["char_422_aurora", "极光", "オーロラ", 5, true],
+    ["char_4230_mcnist", "机械师", "机械师", 6, false],
+    ["char_4231_clemnt", "克莱门莎", "克莱门莎", 6, false],
+    ["char_4232_hbound", "旅骨", "旅骨", 5, false],
+    ["char_4234_pedro", "佩德洛", "佩德洛", 5, false],
+    ["char_4235_thumpy", "珊比", "珊比", 6, false],
+    ["char_4236_tmslot", "时隙", "时隙", 5, false],
+    ["char_4237_jcinta", "嘉辛塔", "嘉辛塔", 5, false],
+    ["char_423_blemsh", "瑕光", "ブレミシャイン", 6, true],
+    ["char_426_billro", "卡涅利安", "カーネリアン", 6, true],
+    ["char_427_vigil", "伺夜", "ヴィジェル", 6, true],
+    ["char_430_fartth", "远牙", "ファートゥース", 6, true],
+    ["char_431_ashlok", "灰毫", "アッシュロック", 5, true],
+    ["char_433_windft", "掠风", "ウインドフリット", 5, true],
+    ["char_436_whispr", "絮雨", "ウィスパーレイン", 5, true],
+    ["char_437_mizuki", "水月", "ミヅキ", 6, true],
+    ["char_440_pinecn", "松果", "パインコーン", 4, true],
+    ["char_445_wscoot", "骋风", "ウィンドスクート", 4, true],
+    ["char_446_aroma", "阿罗玛", "アロマ", 5, true],
+    ["char_449_glider", "蜜莓", "ハニーベリー", 5, true],
+    ["char_450_necras", "死芒", "ネクラス", 6, true],
+    ["char_451_robin", "罗宾", "ロビン", 5, true],
+    ["char_452_bstalk", "豆苗", "ビーンストーク", 4, true],
+    ["char_455_nothin", "乌有", "ウユウ", 5, true],
+    ["char_456_ash", "灰烬", "Ash", 6, true],
+    ["char_457_blitz", "闪击", "Blitz", 5, true],
+    ["char_458_rfrost", "霜华", "Frost", 5, true],
+    ["char_459_tachak", "战车", "Tachanka", 5, true],
+    ["char_464_cement", "洋灰", "セメント", 5, true],
+    ["char_466_qanik", "雪绒", "カニパラート", 5, true],
+    ["char_469_indigo", "深靛", "インディゴ", 4, true],
+    ["char_472_pasngr", "异客", "パッセンジャー", 6, true],
+    ["char_473_mberry", "桑葚", "マルベリー", 5, true],
+    ["char_474_glady", "歌蕾蒂娅", "グレイディーア", 6, true],
+    ["char_475_akafyu", "赤冬", "アカフユ", 5, true],
+    ["char_476_blkngt", "夜半", "ブラックナイト", 5, true],
+    ["char_478_kirara", "绮良", "キララ", 5, true],
+    ["char_479_sleach", "琴柳", "サイラッハ", 6, true],
+    ["char_484_robrta", "罗比菈塔", "ロベルタ", 4, true],
+    ["char_485_pallas", "帕拉斯", "パラス", 6, true],
+    ["char_486_takila", "龙舌兰", "テキーラ", 5, true],
+    ["char_487_bobb", "波卜", "ボビング", 5, true],
+    ["char_488_buildr", "青枳", "ポンシラス", 5, true],
+    ["char_489_serum", "蚀清", "コロセラム", 5, true],
+    ["char_491_humus", "休谟斯", "ヒューマス", 4, true],
+    ["char_492_quercu", "夏栎", "クエルクス", 5, true],
+    ["char_493_firwhl", "火哨", "ファイヤーホイッスル", 5, true],
+    ["char_494_vendla", "刺玫", "ヴァンデラ", 5, true],
+    ["char_496_wildmn", "野鬃", "ワイルドメイン", 5, true],
+    ["char_497_ctable", "晓歌", "カンタービレ", 5, true],
+    ["char_498_inside", "隐现", "インサイダー", 5, true],
+    ["char_499_kaitou", "折光", "ディアマンテ", 5, true],
+    ["char_500_noirc", "黑角", "ノイルホーン", 2, true],
+    ["char_501_durin", "杜林", "ドゥリン", 2, true],
+    ["char_502_nblade", "夜刀", "ヤトウ", 2, true],
+    ["char_503_rang", "巡林者", "レンジャー", 2, true],
+    ["char_504_rguard", "预备干员-近战", "予備隊員-近距離", 3, true],
+    ["char_505_rcast", "预备干员-术师", "予備隊員-術師", 3, true],
+    ["char_506_rmedic", "预备干员-后勤", "予備隊員-支援", 3, true],
+    ["char_507_rsnipe", "预备干员-狙击", "予備隊員-狙撃", 3, true],
+    ["char_508_aguard", "Sharp", "Sharp", 5, true],
+    ["char_509_acast", "Pith", "Pith", 5, true],
+    ["char_510_amedic", "Touch", "Touch", 5, true],
+    ["char_511_asnipe", "Stormeye", "Stormeye", 5, true],
+    ["char_512_aprot", "暮落", "シャレム", 5, true],
+    ["char_513_apionr", "郁金香", "チューリップ", 5, true],
+    ["char_514_rdfend", "预备干员-重装", "予備隊員-重装", 3, true],
+    ["char_600_cpione", "预备干员-先锋", "予備隊員-先鋒", 4, true],
+    ["char_601_cguard", "预备干员-近卫", "予備隊員-前衛", 4, true],
+    ["char_602_cdfend", "预备干员-重装", "予備隊員-重装", 4, true],
+    ["char_603_csnipe", "预备干员-狙击", "予備隊員-狙撃", 4, true],
+    ["char_604_ccast", "预备干员-术师", "予備隊員-術師", 4, true],
+    ["char_605_cmedic", "预备干员-医疗", "予備隊員-医療", 4, true],
+    ["char_606_csuppo", "预备干员-辅助", "予備隊員-補助", 4, true],
+    ["char_607_cspec", "预备干员-特种", "予備隊員-特殊", 4, true],
+    ["char_608_acpion", "郁金香", "チューリップ", 6, true],
+    ["char_609_acguad", "Sharp", "Sharp", 6, true],
+    ["char_610_acfend", "Mechanist", "Mechanist", 6, true],
+    ["char_611_acnipe", "Stormeye", "Stormeye", 6, true],
+    ["char_612_accast", "Pith", "Pith", 6, true],
+    ["char_613_acmedc", "Touch", "Touch", 6, true],
+    ["char_614_acsupo", "Raidian", "Raidian", 6, true],
+    ["char_615_acspec", "Misery", "Misery", 6, true],
+    ["char_616_pithst", "盟约·辅助干员", "盟約・補助オペレーター", 4, true],
+    ["char_617_sharp2", "领主·Sharp", "領主・Sharp", 6, true]
+  ]
+}
+</script>
+<script>
+(() => {
+  // src/core/names.js
+  function createNameIndex(table) {
+    const jpToCnMap = /* @__PURE__ */ new Map();
+    const cnToJpMap = /* @__PURE__ */ new Map();
+    const idMap = /* @__PURE__ */ new Map();
+    const idsByJpMap = /* @__PURE__ */ new Map();
+    for (const [id, nameCn, nameJp, rarity, jpAvailable] of table.chars) {
+      idMap.set(id, { nameCn, nameJp, rarity, jpAvailable });
+      if (!idsByJpMap.has(nameJp)) idsByJpMap.set(nameJp, []);
+      idsByJpMap.get(nameJp).push(id);
+      if (jpAvailable) {
+        if (!jpToCnMap.has(nameJp)) jpToCnMap.set(nameJp, nameCn);
+        if (!cnToJpMap.has(nameCn)) cnToJpMap.set(nameCn, nameJp);
+      }
+    }
+    return {
+      source: table.source,
+      jpNameSet: new Set(jpToCnMap.keys()),
+      jpToCn: (nameJp) => jpToCnMap.get(nameJp) ?? null,
+      cnToJp: (nameCn) => cnToJpMap.get(nameCn) ?? null,
+      idToEntry: (id) => idMap.get(id) ?? null,
+      idsByJp: (nameJp) => idsByJpMap.get(nameJp) ?? [],
+      entries: () => [...idMap.entries()].map(([id, e]) => ({ id, ...e }))
+    };
+  }
+
+  // src/core/operbox.js
+  var AMIYA_ID = "char_002_amiya";
+  var REQUIRED_KEYS = ["id", "name", "own"];
+  function parseOperBox(text, nameIndex2) {
+    const data = JSON.parse(text.replace(/^\uFEFF/, ""));
+    if (!Array.isArray(data)) throw new Error("OperBoxは配列である必要があります");
+    const operators = data.map((item, i) => {
+      if (item === null || typeof item !== "object") {
+        throw new Error(`${i + 1}番目の要素がオブジェクトではありません`);
+      }
+      for (const key of REQUIRED_KEYS) {
+        if (!(key in item)) throw new Error(`${i + 1}番目の要素に必須キー ${key} がありません`);
+      }
+      return {
+        id: item.id,
+        name: item.name,
+        elite: item.elite ?? null,
+        level: item.level ?? null,
+        own: item.own,
+        potential: item.potential ?? null,
+        rarity: item.rarity ?? null
+      };
+    });
+    const amiya = nameIndex2.idToEntry(AMIYA_ID);
+    if (amiya && !operators.some((o) => o.name === amiya.nameJp)) {
+      operators.push({
+        id: AMIYA_ID,
+        name: amiya.nameJp,
+        elite: null,
+        level: null,
+        own: true,
+        potential: null,
+        rarity: amiya.rarity,
+        source: "名前表"
+      });
+    }
+    return buildOperBox(operators);
+  }
+  function buildOperBox(operators) {
+    return {
+      operators,
+      ownedIds: new Set(operators.filter((o) => o.own).map((o) => o.id)),
+      ownedNames: new Set(operators.filter((o) => o.own).map((o) => o.name))
+    };
+  }
+  function isOwned(nameJp, nameIndex2, operbox) {
+    if (!operbox) return null;
+    if (nameIndex2.idsByJp(nameJp).some((id) => operbox.ownedIds.has(id))) return true;
+    return operbox.ownedNames.has(nameJp);
+  }
+
+  // src/core/model.js
+  var FACILITIES = [
+    "control",
+    "manufacture",
+    "trading",
+    "power",
+    "meeting",
+    "hire",
+    "dormitory",
+    "processing",
+    "training"
+  ];
+  var FACILITY_LABELS = {
+    control: "制御中枢",
+    manufacture: "製造所",
+    trading: "貿易所",
+    power: "発電所",
+    meeting: "応接室",
+    hire: "事務室",
+    dormitory: "宿舎",
+    processing: "加工所",
+    training: "訓練室"
+  };
+  var VARIABLE_FACILITIES = ["manufacture", "trading", "power"];
+  var PRESETS = {
+    "243": { manufacture: 4, trading: 2, power: 3 },
+    "153": { manufacture: 5, trading: 1, power: 3 },
+    "252": { manufacture: 5, trading: 2, power: 2 },
+    "333": { manufacture: 3, trading: 3, power: 3 }
+  };
+  var DORMITORY_COUNT = 4;
+  var PRODUCTS = {
+    manufacture: ["Battle Record", "Pure Gold", "Dualchip", "Originium Shard"],
+    trading: ["LMD", "Orundum"]
+  };
+  var PRODUCT_LABELS = {
+    "Battle Record": "作戦記録",
+    "Pure Gold": "純金",
+    Dualchip: "中級SoC",
+    "Originium Shard": "源石の欠片",
+    LMD: "龍門幣",
+    Orundum: "合成玉"
+  };
+  var CAPACITY = {
+    control: 5,
+    manufacture: 3,
+    trading: 3,
+    power: 1,
+    meeting: 2,
+    hire: 1,
+    dormitory: 5,
+    processing: 1
+  };
+  var idCounter = 0;
+  function newId() {
+    idCounter += 1;
+    return `p${Date.now().toString(36)}${idCounter}`;
+  }
+  function roomCount(layout, facility) {
+    if (facility === "dormitory") return DORMITORY_COUNT;
+    if (VARIABLE_FACILITIES.includes(facility)) return layout[facility];
+    return 1;
+  }
+  function createRoom(facility) {
+    if (facility === "training") return { skip: false, operatorsA: [], operatorsB: [] };
+    const room = {
+      operators: [],
+      candidates: [],
+      sort: ["control", "manufacture", "trading"].includes(facility),
+      skip: false,
+      autofill: facility === "dormitory"
+    };
+    if (facility === "manufacture" || facility === "trading") room.product = "";
+    return room;
+  }
+  function createPlan(layout) {
+    const rooms = {};
+    for (const facility of FACILITIES) {
+      rooms[facility] = Array.from({ length: roomCount(layout, facility) }, () => createRoom(facility));
+    }
+    return {
+      id: newId(),
+      name: "",
+      description: "",
+      periods: [],
+      fiammetta: { enable: false, target: "", order: "pre" },
+      drones: { enable: false, room: "trading", index: 1, order: "pre" },
+      rooms
+    };
+  }
+  function createProject() {
+    const layout = { ...PRESETS["243"], dormitory: DORMITORY_COUNT };
+    const plan = createPlan(layout);
+    plan.name = "プラン 1";
+    return { title: "", description: "", layout, plans: [plan] };
+  }
+  function resizeRooms(project, facility, n) {
+    for (const plan of project.plans) {
+      const rooms = plan.rooms[facility];
+      if (!rooms) continue;
+      while (rooms.length < n) rooms.push(createRoom(facility));
+      rooms.length = n;
+    }
+  }
+  function setRoomCount(project, facility, n) {
+    if (!VARIABLE_FACILITIES.includes(facility)) return;
+    const count = Math.min(9, Math.max(1, Math.trunc(n)));
+    project.layout[facility] = count;
+    resizeRooms(project, facility, count);
+  }
+  function applyPreset(project, name) {
+    const preset = PRESETS[name];
+    if (!preset) return;
+    for (const facility of VARIABLE_FACILITIES) setRoomCount(project, facility, preset[facility]);
+  }
+  function isRoomEmpty(room) {
+    return !(room.operators?.length || room.candidates?.length || room.operatorsA?.length || room.operatorsB?.length);
+  }
+  function wouldDiscard(project, facility, n) {
+    return project.plans.some((plan) => (plan.rooms[facility] ?? []).slice(n).some((r) => !isRoomEmpty(r)));
+  }
+  function setFacilityEnabled(plan, facility, on, layout) {
+    if (!on) {
+      delete plan.rooms[facility];
+      return;
+    }
+    if (plan.rooms[facility]) return;
+    const rooms = Array.from({ length: roomCount(layout, facility) }, () => createRoom(facility));
+    const next = {};
+    for (const f of FACILITIES) {
+      if (f === facility) next[f] = rooms;
+      else if (plan.rooms[f]) next[f] = plan.rooms[f];
+    }
+    plan.rooms = next;
+  }
+  function duplicatePlan(project, index) {
+    if (!project.plans[index]) return;
+    const copy = structuredClone(project.plans[index]);
+    copy.id = newId();
+    copy.name = `${copy.name} のコピー`;
+    project.plans.splice(index + 1, 0, copy);
+  }
+  function movePlan(project, index, delta) {
+    const to = index + delta;
+    if (!project.plans[index] || !project.plans[to]) return;
+    const [plan] = project.plans.splice(index, 1);
+    project.plans.splice(to, 0, plan);
+  }
+  function removePlan(project, index) {
+    if (!project.plans[index]) return;
+    project.plans.splice(index, 1);
+  }
+  function addPlan(project) {
+    const plan = createPlan(project.layout);
+    plan.name = `プラン ${project.plans.length + 1}`;
+    project.plans.push(plan);
+  }
+
+  // src/core/time.js
+  var TIME_PATTERN = /^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/;
+  function isValidTime(value) {
+    return typeof value === "string" && TIME_PATTERN.test(value);
+  }
+  function isValidPeriod(period) {
+    return Array.isArray(period) && period.length === 2 && isValidTime(period[0]) && isValidTime(period[1]);
+  }
+  function toMinutes(time) {
+    const [h2, m] = time.split(":");
+    return Number(h2) * 60 + Number(m);
+  }
+  function normalizeTime(value) {
+    if (!isValidTime(value)) return value;
+    const [h2, m] = value.split(":");
+    return `${h2.padStart(2, "0")}:${m}`;
+  }
+  function splitPeriods(periods) {
+    const result = [];
+    for (const period of periods) {
+      if (isValidPeriod(period) && toMinutes(period[0]) > toMinutes(period[1])) {
+        result.push([period[0], "23:59"], ["00:00", period[1]]);
+      } else {
+        result.push(period);
+      }
+    }
+    return result;
+  }
+
+  // src/core/importer.js
+  var KNOWN_FACILITIES = new Set(FACILITIES);
+  var DRONE_ROOMS = ["trading", "manufacture"];
+  function buildExtensionNameToId(operators) {
+    const map = /* @__PURE__ */ new Map();
+    if (Array.isArray(operators)) {
+      for (const o of operators) {
+        if (o && typeof o.name === "string" && typeof o.id === "string") map.set(o.name, o.id);
+      }
+    } else if (operators && typeof operators === "object") {
+      for (const [id, o] of Object.entries(operators)) {
+        if (o && typeof o.name === "string") map.set(o.name, id);
+      }
+    }
+    return map;
+  }
+  function countLayout(layout) {
+    const counts = {};
+    if (!Array.isArray(layout)) return counts;
+    for (const item of layout) {
+      if (item && typeof item.type === "string") counts[item.type] = (counts[item.type] ?? 0) + 1;
+    }
+    return counts;
+  }
+  function importPlan(text, nameIndex2) {
+    const data = JSON.parse(text.replace(/^\uFEFF/, ""));
+    if (!data || !Array.isArray(data.plans)) throw new Error("plans が配列ではありません");
+    const report = { converted: 0, unresolved: [], dropped: [], warnings: [] };
+    const droppedSet = /* @__PURE__ */ new Set();
+    const drop = (scope, key, message) => {
+      const entry = `${scope}: ${key}: ${message}`;
+      if (!droppedSet.has(entry)) {
+        droppedSet.add(entry);
+        report.dropped.push(entry);
+      }
+    };
+    const nameToId = buildExtensionNameToId(data.operators);
+    function convertName(name) {
+      if (typeof name !== "string" || name === "") return name;
+      let result = null;
+      const id = nameToId.get(name);
+      const entry = id ? nameIndex2.idToEntry(id) : null;
+      if (entry && entry.jpAvailable) result = entry.nameJp;
+      if (result === null) result = nameIndex2.cnToJp(name);
+      if (result === null && nameIndex2.jpNameSet.has(name)) result = name;
+      if (result === null) {
+        if (!report.unresolved.includes(name)) report.unresolved.push(name);
+        return name;
+      }
+      report.converted += 1;
+      return result;
+    }
+    const convertNames = (list) => Array.isArray(list) ? list.map(convertName) : [];
+    const layoutCounts = countLayout(data.layout);
+    if (layoutCounts.recycle) drop("全体", "recycle", "回収ステーションは未対応のため除外");
+    if (data.groups) drop("全体", "groups", "オペレーターグループは未対応のため除外");
+    const layout = { dormitory: DORMITORY_COUNT };
+    for (const facility of VARIABLE_FACILITIES) {
+      let n = layoutCounts[facility] ?? 0;
+      if (n === 0) {
+        for (const plan of data.plans) {
+          const arr = plan?.rooms?.[facility];
+          if (Array.isArray(arr)) n = Math.max(n, arr.length);
+        }
+      }
+      if (n === 0) n = PRESETS["243"][facility];
+      if (n > 9) {
+        drop("全体", facility, `部屋数が上限(9)を超えたため${n}から9に切り詰め`);
+        n = 9;
+      }
+      layout[facility] = n;
+    }
+    if ((layoutCounts.dormitory ?? 0) > DORMITORY_COUNT) {
+      drop("全体", "dormitory", `宿舎が${DORMITORY_COUNT}部屋を超えたため切り詰め`);
+    }
+    for (const facility of ["control", "meeting", "hire", "processing", "training"]) {
+      if ((layoutCounts[facility] ?? 0) > 1) drop("全体", facility, "1部屋を超えたため切り詰め");
+    }
+    const project = {
+      title: typeof data.title === "string" ? data.title : "",
+      description: typeof data.description === "string" ? data.description : "",
+      layout,
+      plans: []
+    };
+    function readRoom(fac, room, planName) {
+      const out = createRoom(fac);
+      if (fac === "training") {
+        if (room && typeof room === "object") {
+          out.skip = room.skip === true;
+          out.operatorsA = convertNames(room.operatorsA);
+          out.operatorsB = convertNames(room.operatorsB);
+        }
+        return out;
+      }
+      out.sort = false;
+      out.autofill = false;
+      if (!room || typeof room !== "object") return out;
+      if (room.use_operator_groups === true) {
+        drop(planName, fac, "use_operator_groups: オペレーターグループは未対応のため除外");
+      } else {
+        out.operators = convertNames(room.operators);
+      }
+      out.candidates = convertNames(room.candidates);
+      out.sort = room.sort === true;
+      out.skip = room.skip === true;
+      out.autofill = room.autofill === true;
+      if ("product" in out) out.product = typeof room.product === "string" ? room.product : "";
+      return out;
+    }
+    data.plans.forEach((src, index) => {
+      const plan = createPlan(layout);
+      plan.rooms = {};
+      plan.id = newId();
+      const planName = typeof src?.name === "string" && src.name !== "" ? src.name : `プラン ${index + 1}`;
+      plan.name = planName;
+      plan.description = typeof src?.description === "string" ? src.description : "";
+      plan.periods = Array.isArray(src?.period) ? src.period.map((p) => Array.isArray(p) ? p.map(normalizeTime) : p) : [];
+      const f = src?.Fiammetta;
+      if (f && typeof f === "object") {
+        plan.fiammetta = {
+          enable: f.enable === void 0 ? true : f.enable === true,
+          target: typeof f.target === "string" ? convertName(f.target) : "",
+          order: f.order === "post" ? "post" : "pre"
+        };
+      }
+      const d = src?.drones;
+      if (d && typeof d === "object") {
+        const validRoom = DRONE_ROOMS.includes(d.room);
+        if (!validRoom) report.warnings.push(`${planName}: drones.room が不正または未指定のため、ドローンを無効にしました`);
+        plan.drones = {
+          enable: validRoom && (d.enable === void 0 ? true : d.enable === true),
+          room: validRoom ? d.room : "trading",
+          index: Number.isInteger(d.index) ? d.index : 1,
+          order: d.order === "post" ? "post" : "pre"
+        };
+      }
+      if (src?.groups) drop(planName, "groups", "オペレーターグループは未対応のため除外");
+      const rooms = src?.rooms && typeof src.rooms === "object" ? src.rooms : {};
+      for (const facility of Object.keys(rooms)) {
+        if (facility === "recycle") {
+          drop(planName, "recycle", "回収ステーションは未対応のため除外");
+          continue;
+        }
+        if (!KNOWN_FACILITIES.has(facility)) {
+          report.warnings.push(`${planName}: 未知の施設キー ${facility} を無視しました`);
+        }
+      }
+      for (const facility of FACILITIES) {
+        const list = rooms[facility];
+        if (list === void 0) continue;
+        if (!Array.isArray(list)) {
+          report.warnings.push(`${planName}: ${facility} が配列ではないため無視しました`);
+          continue;
+        }
+        const count = facility === "dormitory" ? DORMITORY_COUNT : VARIABLE_FACILITIES.includes(facility) ? layout[facility] : 1;
+        if (list.length > count) drop(planName, facility, `部屋数(${count})を超えた分を切り詰め`);
+        plan.rooms[facility] = Array.from({ length: count }, (_, i) => readRoom(facility, list[i], planName));
+      }
+      project.plans.push(plan);
+    });
+    return { project, report };
+  }
+
+  // src/core/exporter.js
+  function toOutputName(name, nameIndex2) {
+    return nameIndex2.jpToCn(name) ?? name;
+  }
+  function exportRoom(facility, room, nameIndex2) {
+    const names = (list) => list.map((n) => toOutputName(n, nameIndex2));
+    const out = {};
+    if (facility === "training") {
+      if (room.operatorsA?.length) out.operatorsA = names(room.operatorsA);
+      if (room.operatorsB?.length) out.operatorsB = names(room.operatorsB);
+      if (room.skip) out.skip = true;
+      return out;
+    }
+    if (room.operators?.length) out.operators = names(room.operators);
+    if (room.candidates?.length) out.candidates = names(room.candidates);
+    if (room.sort) out.sort = true;
+    if (room.product) out.product = room.product;
+    if (room.skip) out.skip = true;
+    if (room.autofill) out.autofill = true;
+    return out;
+  }
+  function exportPlanEntry(plan, layout, nameIndex2) {
+    const out = { name: plan.name };
+    if (plan.description) out.description = plan.description;
+    if (plan.periods.length > 0) out.period = splitPeriods(plan.periods);
+    const f = plan.fiammetta;
+    if (f.enable || f.target !== "" || f.order !== "pre") {
+      out.Fiammetta = { enable: f.enable, target: toOutputName(f.target, nameIndex2), order: f.order };
+    }
+    const d = plan.drones;
+    if (d.enable || d.room !== "trading" || d.index !== 1 || d.order !== "pre") {
+      out.drones = { enable: d.enable, room: d.room, index: d.index, order: d.order };
+    }
+    const rooms = {};
+    for (const facility of FACILITIES) {
+      const list = plan.rooms[facility];
+      if (!list) continue;
+      rooms[facility] = Array.from({ length: roomCount(layout, facility) }, (_, i) => list[i] ? exportRoom(facility, list[i], nameIndex2) : {});
+    }
+    out.rooms = rooms;
+    return out;
+  }
+  function exportPlan(project, nameIndex2) {
+    const out = {};
+    if (project.title) out.title = project.title;
+    if (project.description) out.description = project.description;
+    out.plans = project.plans.map((p) => exportPlanEntry(p, project.layout, nameIndex2));
+    return JSON.stringify(out, null, 2) + "\n";
+  }
+
+  // src/core/storage.js
+  var KEY = "maa-infra-planner:v1";
+  var VERSION = 1;
+  var DEBOUNCE_MS = 300;
+  function createStorage(backend2, { setTimer = setTimeout, clearTimer = clearTimeout } = {}) {
+    let timer = null;
+    let pending = null;
+    function slimOperbox(operbox) {
+      if (!operbox) return null;
+      return {
+        operators: operbox.operators.map(
+          ({ id, name, elite, level, own, potential, rarity }) => ({ id, name, elite, level, own, potential, rarity })
+        )
+      };
+    }
+    function writeNow(project, operbox) {
+      try {
+        backend2.setItem(KEY, JSON.stringify({ version: VERSION, project, operbox: slimOperbox(operbox) }));
+      } catch {
+      }
+    }
+    return {
+      // 保存内容がなければ null。version 不一致や壊れたデータも破棄して null
+      load() {
+        try {
+          const raw = backend2.getItem(KEY);
+          if (!raw) return null;
+          const data = JSON.parse(raw);
+          if (data.version !== VERSION || !data.project) return null;
+          return { project: data.project, operbox: data.operbox };
+        } catch {
+          return null;
+        }
+      },
+      save(project, operbox) {
+        if (timer !== null) clearTimer(timer);
+        pending = { project, operbox };
+        timer = setTimer(() => {
+          timer = null;
+          pending = null;
+          writeNow(project, operbox);
+        }, DEBOUNCE_MS);
+      },
+      // タブを閉じる直前など、デバウンス待ちの保存を即時に書き切る
+      flush() {
+        if (timer === null) return;
+        clearTimer(timer);
+        timer = null;
+        const { project, operbox } = pending;
+        pending = null;
+        writeNow(project, operbox);
+      },
+      saveNow: writeNow
+    };
+  }
+
+  // src/core/validator.js
+  var ALL_PRODUCTS = [...PRODUCTS.manufacture, ...PRODUCTS.trading];
+  function* eachNameSlot(plan) {
+    for (const facility of FACILITIES) {
+      const rooms = plan.rooms[facility] ?? [];
+      for (let r = 0; r < rooms.length; r++) {
+        for (const field of ["operators", "candidates", "operatorsA", "operatorsB"]) {
+          for (const name of rooms[r][field] ?? []) yield { name, facility, room: r };
+        }
+      }
+    }
+    if (plan.fiammetta.target) yield { name: plan.fiammetta.target, facility: null, room: null };
+  }
+  function overlaps(a, b) {
+    return toMinutes(a[0]) < toMinutes(b[1]) && toMinutes(b[0]) < toMinutes(a[1]);
+  }
+  function validate(project, nameIndex2, operbox) {
+    const issues = [];
+    const add = (level, code, message, plan, facility, room) => {
+      const issue = { level, code, message, plan };
+      if (facility !== void 0 && facility !== null) issue.facility = facility;
+      if (room !== void 0 && room !== null) issue.room = room;
+      issues.push(issue);
+    };
+    project.plans.forEach((plan, p) => {
+      const label = plan.name || `プラン ${p + 1}`;
+      const seen = /* @__PURE__ */ new Set();
+      const reported = /* @__PURE__ */ new Set();
+      for (const facility of FACILITIES) {
+        (plan.rooms[facility] ?? []).forEach((room, r) => {
+          for (const name of room.operators ?? []) {
+            if (seen.has(name) && !reported.has(name)) {
+              reported.add(name);
+              add("error", "dup-operator", `${label}: ${name} が複数の枠に配置されています`, p, facility, r);
+            }
+            seen.add(name);
+          }
+        });
+      }
+      for (const facility of FACILITIES) {
+        (plan.rooms[facility] ?? []).forEach((room, r) => {
+          const where = `${label}: ${FACILITY_LABELS[facility]}${r + 1}`;
+          const operators = room.operators ?? [];
+          if (room.autofill && (room.candidates ?? []).length > 0) {
+            add("error", "autofill-candidates", `${where}: 自動配置と候補は併用できません`, p, facility, r);
+          }
+          if (operators.length >= 6) {
+            add("error", "too-many", `${where}: 1部屋に配置できるのは5人までです`, p, facility, r);
+          } else if (CAPACITY[facility] !== void 0 && operators.length > CAPACITY[facility]) {
+            add("warn", "capacity", `${where}: 標準人数(${CAPACITY[facility]}人)を超えています`, p, facility, r);
+          }
+          if (room.product && !ALL_PRODUCTS.includes(room.product)) {
+            add("error", "product", `${where}: 未知の製品 ${room.product} です`, p, facility, r);
+          } else if (room.product && facility === "manufacture" && PRODUCTS.trading.includes(room.product)) {
+            add("warn", "product-room", `${where}: 製造所に ${room.product} は指定できません`, p, facility, r);
+          } else if (room.product && facility === "trading" && PRODUCTS.manufacture.includes(room.product)) {
+            add("warn", "product-room", `${where}: 貿易所に ${room.product} は指定できません`, p, facility, r);
+          }
+        });
+      }
+      plan.periods.forEach((period) => {
+        if (!isValidPeriod(period)) {
+          add(
+            "error",
+            "period-format",
+            `${label}: 時間帯 ${JSON.stringify(period)} の形式が不正です(HH:MM)`,
+            p
+          );
+        }
+      });
+      if (plan.drones.enable) {
+        const max = roomCount(project.layout, plan.drones.room);
+        const index = plan.drones.index;
+        if (!Number.isInteger(index) || index < 1 || index > max) {
+          add("error", "drones-index", `${label}: ドローンの施設番号は1〜${max}にしてください`, p);
+        }
+      }
+      if (plan.fiammetta.enable && !plan.fiammetta.target) {
+        add("error", "fiammetta-target", `${label}: フィアメッタの回復対象が未指定です`, p);
+      }
+      const warned = /* @__PURE__ */ new Set();
+      for (const slot of eachNameSlot(plan)) {
+        const key = `${slot.name}|${slot.facility}|${slot.room}`;
+        if (warned.has(key)) continue;
+        warned.add(key);
+        const where = slot.facility ? `${label}: ${FACILITY_LABELS[slot.facility]}${slot.room + 1}` : `${label}: フィアメッタの回復対象`;
+        if (!nameIndex2.jpNameSet.has(slot.name)) {
+          add("warn", "unresolved", `${where}: ${slot.name} は名前表にありません`, p, slot.facility, slot.room);
+        } else if (isOwned(slot.name, nameIndex2, operbox) === false) {
+          add("warn", "not-owned", `${where}: ${slot.name} は未所持です`, p, slot.facility, slot.room);
+        }
+      }
+    });
+    const spans = project.plans.map((plan) => splitPeriods(plan.periods).filter(isValidPeriod));
+    for (let a = 0; a < spans.length; a++) {
+      for (let b = a + 1; b < spans.length; b++) {
+        if (spans[a].some((x) => spans[b].some((y) => overlaps(x, y)))) {
+          const nameA = project.plans[a].name || `プラン ${a + 1}`;
+          const nameB = project.plans[b].name || `プラン ${b + 1}`;
+          add("warn", "period-overlap", `${nameA} と ${nameB} の時間帯が重なっています`, a);
+        }
+      }
+    }
+    const withPeriod = project.plans.filter((plan) => plan.periods.length > 0).length;
+    if (withPeriod > 0 && withPeriod < project.plans.length) {
+      add(
+        "warn",
+        "period-partial",
+        "一部のプランにだけ時間帯が設定されています。MAAが予期しない動作をする場合があります",
+        null
+      );
+    }
+    const order = { error: 0, warn: 1 };
+    return issues.sort((x, y) => order[x.level] - order[y.level]);
+  }
+
+  // src/ui/dom.js
+  function h(tag, attrs = {}, ...children) {
+    const el = document.createElement(tag);
+    for (const [key, value] of Object.entries(attrs ?? {})) {
+      if (value === void 0 || value === null || value === false) continue;
+      if (key.startsWith("on")) el.addEventListener(key.slice(2).toLowerCase(), value);
+      else if (key === "class") el.className = value;
+      else if (key === "value" || key === "checked" || key === "disabled" || key === "selected") el[key] = value;
+      else el.setAttribute(key, value === true ? "" : value);
+    }
+    append(el, children);
+    return el;
+  }
+  function append(el, children) {
+    for (const child of children.flat(Infinity)) {
+      if (child === null || child === void 0 || child === false) continue;
+      el.append(child instanceof Node ? child : document.createTextNode(String(child)));
+    }
+  }
+  function fill(el, ...children) {
+    el.replaceChildren();
+    append(el, children);
+    return el;
+  }
+
+  // src/ui/dialogs.js
+  function openImportDialog({ dialog: dialog2, report, onConfirm }) {
+    const section = (title, items) => items.length > 0 && h(
+      "div",
+      {},
+      h("h3", {}, `${title}(${items.length})`),
+      h("ul", {}, items.map((i) => h("li", {}, i)))
+    );
+    dialog2.replaceChildren(
+      h("h2", {}, "取り込み結果"),
+      h(
+        "div",
+        { class: "report" },
+        h("p", {}, `名前の変換: ${report.converted} 件`),
+        section("未解決名（原文のまま保持します）", report.unresolved),
+        section("除外した項目", report.dropped),
+        section("警告", report.warnings),
+        h("p", { class: "muted" }, "取り込むと、現在の編集内容は置き換えられます。")
+      ),
+      h(
+        "div",
+        { class: "dialog-actions" },
+        h("button", { onClick: () => dialog2.close() }, "キャンセル"),
+        h("button", { class: "primary", onClick: () => {
+          dialog2.close();
+          onConfirm();
+        } }, "取り込む")
+      )
+    );
+    dialog2.showModal();
+  }
+  function openLayoutDialog({ dialog: dialog2, project, onApplyPreset, onSetCount }) {
+    function discardOk(facility, n) {
+      return !wouldDiscard(project, facility, n) || window.confirm(`${FACILITY_LABELS[facility]}を${n}部屋に減らすと、配置済みの部屋が削除されます。続けますか？`);
+    }
+    const presetSelect = h("select", {
+      "aria-label": "プリセット",
+      onChange: (e) => {
+        const preset = PRESETS[e.target.value];
+        if (!preset) return;
+        const ok = VARIABLE_FACILITIES.every((f) => discardOk(f, preset[f]));
+        if (ok) onApplyPreset(e.target.value);
+        render();
+      }
+    }, h("option", { value: "" }, "選択して適用"), Object.keys(PRESETS).map((k) => h("option", { value: k }, k)));
+    const body = h("div", { class: "stack" });
+    function render() {
+      fill(
+        body,
+        h("div", { class: "row" }, h("label", {}, "プリセット ", presetSelect)),
+        VARIABLE_FACILITIES.map((facility) => h(
+          "div",
+          { class: "row" },
+          h(
+            "label",
+            {},
+            `${FACILITY_LABELS[facility]}の数 `,
+            h("input", {
+              type: "number",
+              min: "1",
+              max: "9",
+              value: String(project.layout[facility]),
+              onChange: (e) => {
+                const n = Math.min(9, Math.max(1, Math.trunc(Number(e.target.value)) || 1));
+                if (discardOk(facility, n)) onSetCount(facility, n);
+                render();
+              }
+            })
+          )
+        )),
+        h("p", { class: "muted" }, "全プラン共通です。宿舎は4部屋に固定されています。")
+      );
+    }
+    render();
+    dialog2.replaceChildren(
+      h("h2", {}, "基地の構成"),
+      body,
+      h("div", { class: "dialog-actions" }, h("button", { class: "primary", onClick: () => dialog2.close() }, "閉じる"))
+    );
+    dialog2.showModal();
+  }
+
+  // src/ui/picker.js
+  function buildChoices(nameIndex2, operbox) {
+    const byName = /* @__PURE__ */ new Map();
+    for (const e of nameIndex2.entries()) {
+      if (e.jpAvailable && !byName.has(e.nameJp)) {
+        byName.set(e.nameJp, { name: e.nameJp, rarity: e.rarity, elite: null, level: null });
+      }
+    }
+    if (operbox) {
+      for (const o of operbox.operators) {
+        const base = byName.get(o.name) ?? { name: o.name, rarity: o.rarity, elite: null, level: null };
+        if (o.own || !byName.has(o.name) || base.elite === null) {
+          byName.set(o.name, { ...base, rarity: o.rarity ?? base.rarity, elite: o.elite, level: o.level });
+        }
+      }
+    }
+    const choices = [...byName.values()].map((c) => ({ ...c, owned: isOwned(c.name, nameIndex2, operbox) }));
+    return choices.sort((a, b) => (b.rarity ?? 0) - (a.rarity ?? 0) || a.name.localeCompare(b.name, "ja"));
+  }
+  function openPicker({ dialog: dialog2, nameIndex: nameIndex2, operbox, title, taken, onPick }) {
+    const choices = buildChoices(nameIndex2, operbox);
+    let query = "";
+    let ownedOnly = operbox !== null;
+    let rarity = "";
+    const list = h("div", { class: "picker-list", role: "listbox" });
+    const search = h("input", {
+      type: "text",
+      placeholder: "名前で検索",
+      "aria-label": "名前で検索",
+      onInput: (e) => {
+        query = e.target.value;
+        renderList();
+      }
+    });
+    const ownedBox = h("input", {
+      type: "checkbox",
+      checked: ownedOnly,
+      disabled: operbox === null,
+      onChange: (e) => {
+        ownedOnly = e.target.checked;
+        renderList();
+      }
+    });
+    const rarityBox = h(
+      "select",
+      { "aria-label": "レアリティ", onChange: (e) => {
+        rarity = e.target.value;
+        renderList();
+      } },
+      h("option", { value: "" }, "すべて"),
+      [6, 5, 4, 3, 2, 1].map((r) => h("option", { value: String(r) }, `★${r}`))
+    );
+    function renderList() {
+      list.replaceChildren();
+      const rows = choices.filter((c) => c.name.includes(query) && (!ownedOnly || c.owned !== false) && (rarity === "" || String(c.rarity) === rarity));
+      for (const c of rows) {
+        list.append(h(
+          "button",
+          {
+            class: `pick-row${taken.has(c.name) ? " taken" : ""}`,
+            role: "option",
+            onClick: () => {
+              dialog2.close();
+              onPick(c.name);
+            }
+          },
+          h("span", {}, c.name),
+          h("span", {}, c.rarity ? `★${c.rarity}` : ""),
+          h("span", {}, c.elite !== null && c.elite !== void 0 ? `昇進${c.elite} Lv${c.level ?? "—"}` : "—"),
+          h("span", { class: "tag" }, c.owned === false ? "未所持" : taken.has(c.name) ? "配置済み" : "")
+        ));
+      }
+      if (rows.length === 0) list.append(h("p", { class: "muted" }, "該当なし"));
+    }
+    dialog2.replaceChildren(
+      h("h2", {}, title),
+      h(
+        "div",
+        { class: "row" },
+        search,
+        h("label", {}, ownedBox, " 所持のみ"),
+        h("label", {}, "レアリティ ", rarityBox)
+      ),
+      list,
+      h("div", { class: "dialog-actions" }, h("button", { onClick: () => dialog2.close() }, "閉じる"))
+    );
+    renderList();
+    dialog2.showModal();
+    search.focus();
+  }
+
+  // src/ui/render.js
+  var ROOM_FIELD_LABELS = { operators: "配置", candidates: "候補", operatorsA: "協力者（訓練時間を短縮する資質を持つオペレーター）", operatorsB: "訓練するオペレーター" };
+  function createView(root2, ctx) {
+    const { state: state2, nameIndex: nameIndex2 } = ctx;
+    const planListEl = h("div", { id: "planList" });
+    const validationEl = h("div", { id: "validation" });
+    const statusEl = h("span", { class: "status" });
+    const plan = () => state2.project.plans[state2.selected];
+    function update(fn) {
+      fn();
+      ctx.changed();
+      renderAll();
+    }
+    function light(fn) {
+      fn();
+      ctx.changed();
+      refreshSide();
+    }
+    function takenNames(p) {
+      const taken = /* @__PURE__ */ new Set();
+      for (const rooms of Object.values(p.rooms)) for (const r of rooms) (r.operators ?? []).forEach((n) => taken.add(n));
+      return taken;
+    }
+    function chipList(list, { onChange, title, p }) {
+      const items = list.map((name, i) => h(
+        "div",
+        { class: `chip${nameIndex2.jpNameSet.has(name) ? "" : " unresolved"}` },
+        h("span", { class: "name" }, name),
+        h("button", { "aria-label": `${name}を上へ`, disabled: i === 0, onClick: () => update(() => {
+          swap(list, i, i - 1);
+          onChange?.();
+        }) }, "↑"),
+        h("button", { "aria-label": `${name}を下へ`, disabled: i === list.length - 1, onClick: () => update(() => {
+          swap(list, i, i + 1);
+          onChange?.();
+        }) }, "↓"),
+        h("button", { "aria-label": `${name}を削除`, onClick: () => update(() => {
+          list.splice(i, 1);
+          onChange?.();
+        }) }, "✕")
+      ));
+      const add = h("button", {
+        onClick: () => ctx.openPicker({
+          title,
+          taken: takenNames(p),
+          onPick: (name) => update(() => {
+            list.push(name);
+          })
+        })
+      }, "＋追加");
+      return h("div", {}, h("div", { class: "chips" }, items), add);
+    }
+    function swap(list, a, b) {
+      if (a < 0 || b < 0 || a >= list.length || b >= list.length) return;
+      [list[a], list[b]] = [list[b], list[a]];
+    }
+    function check(label, obj, key, { disabled = false } = {}) {
+      return h(
+        "label",
+        { class: disabled ? "disabled" : "" },
+        h("input", { type: "checkbox", checked: obj[key], disabled, onChange: (e) => update(() => {
+          obj[key] = e.target.checked;
+        }) }),
+        ` ${label}`
+      );
+    }
+    function roomCard(facility, rooms, p) {
+      const cards = rooms.map((room, r) => {
+        const training = facility === "training";
+        const fields = training ? ["operatorsB", "operatorsA"] : ["operators"];
+        return h(
+          "div",
+          { class: "room", "data-room": `${state2.selected}-${facility}-${r}` },
+          rooms.length > 1 && h("h3", {}, `${FACILITY_LABELS[facility]} ${r + 1}`),
+          fields.map((field) => h(
+            "div",
+            {},
+            h("div", { class: "muted" }, ROOM_FIELD_LABELS[field]),
+            chipList(room[field], { title: `${FACILITY_LABELS[facility]}${rooms.length > 1 ? ` ${r + 1}` : ""}の${training ? ROOM_FIELD_LABELS[field].replace(/（.*）/, "") : ""}に追加`, p })
+          )),
+          h(
+            "div",
+            { class: "checks" },
+            !training && check("並べ替え(sort)", room, "sort"),
+            check("変更しない(skip)", room, "skip"),
+            !training && check("自動配置(autofill)", room, "autofill")
+          ),
+          (facility === "manufacture" || facility === "trading") && h(
+            "div",
+            { class: "row" },
+            "製品 ",
+            h(
+              "select",
+              { "aria-label": "製品", onChange: (e) => update(() => {
+                room.product = e.target.value;
+              }) },
+              h("option", { value: "" }, "指定なし"),
+              PRODUCTS[facility].map((v) => h("option", { value: v, selected: room.product === v }, PRODUCT_LABELS[v])),
+              room.product && !PRODUCTS[facility].includes(room.product) && h("option", { value: room.product, selected: true }, room.product)
+            )
+          ),
+          !training && h(
+            "div",
+            { class: room.autofill ? "disabled" : "" },
+            h("div", { class: "muted" }, room.autofill ? `${ROOM_FIELD_LABELS.candidates}（自動配置中は使えません）` : ROOM_FIELD_LABELS.candidates),
+            room.autofill ? h("div", { class: "chips" }, room.candidates.map((n) => h("div", { class: "chip" }, n))) : chipList(room.candidates, { title: `${FACILITY_LABELS[facility]}の候補に追加`, p })
+          )
+        );
+      });
+      return h("section", { class: "panel facility-card" }, h("h2", {}, FACILITY_LABELS[facility]), h("div", { class: "rooms" }, cards));
+    }
+    function planForm(p) {
+      const periods = p.periods.map((period, i) => h(
+        "div",
+        { class: "row period-row" },
+        h("input", { type: "text", "aria-label": "開始", placeholder: "HH:MM", value: period[0] ?? "", onInput: (e) => light(() => setPeriod(p, i, 0, e.target.value)) }),
+        "〜",
+        h("input", { type: "text", "aria-label": "終了", placeholder: "HH:MM", value: period[1] ?? "", onInput: (e) => light(() => setPeriod(p, i, 1, e.target.value)) }),
+        h("button", { "aria-label": "時間帯を削除", onClick: () => update(() => p.periods.splice(i, 1)) }, "✕")
+      ));
+      const droneMax = roomCount(state2.project.layout, p.drones.room);
+      const droneIndexes = Array.from({ length: droneMax }, (_, i) => i + 1);
+      if (!droneIndexes.includes(p.drones.index)) droneIndexes.push(p.drones.index);
+      return h(
+        "div",
+        { class: "stack" },
+        h(
+          "div",
+          {},
+          h("div", { class: "muted" }, "プラン名"),
+          h("input", { type: "text", "aria-label": "プラン名", value: p.name, onInput: (e) => light(() => {
+            p.name = e.target.value;
+          }) })
+        ),
+        h(
+          "div",
+          {},
+          h("div", { class: "muted" }, "説明"),
+          h("input", { type: "text", "aria-label": "プランの説明", value: p.description, onInput: (e) => light(() => {
+            p.description = e.target.value;
+          }) })
+        ),
+        h(
+          "div",
+          {},
+          h("h3", {}, "時間帯(period)"),
+          periods,
+          h("button", { onClick: () => update(() => p.periods.push(["08:00", "10:00"])) }, "＋時間帯を追加"),
+          h("p", { class: "muted" }, "開始が終了より遅い（日をまたぐ）区間も入力できます。出力時に2区間へ分割されます。")
+        ),
+        h(
+          "div",
+          {},
+          h("h3", {}, "フィアメッタ"),
+          check("有効", p.fiammetta, "enable"),
+          h(
+            "div",
+            { class: "row" },
+            "回復対象: ",
+            h("button", {
+              onClick: () => ctx.openPicker({ title: "フィアメッタの回復対象", taken: /* @__PURE__ */ new Set(), onPick: (n) => update(() => {
+                p.fiammetta.target = n;
+              }) })
+            }, p.fiammetta.target || "未指定"),
+            p.fiammetta.target && h("button", { "aria-label": "回復対象を解除", onClick: () => update(() => {
+              p.fiammetta.target = "";
+            }) }, "✕")
+          ),
+          orderSelect(p.fiammetta)
+        ),
+        h(
+          "div",
+          {},
+          h("h3", {}, "ドローン"),
+          check("使う", p.drones, "enable"),
+          h(
+            "div",
+            { class: "row" },
+            h(
+              "select",
+              { "aria-label": "ドローンを使う施設", onChange: (e) => update(() => {
+                p.drones.room = e.target.value;
+              }) },
+              h("option", { value: "trading", selected: p.drones.room === "trading" }, "貿易所"),
+              h("option", { value: "manufacture", selected: p.drones.room === "manufacture" }, "製造所")
+            ),
+            h(
+              "select",
+              { "aria-label": "施設番号", onChange: (e) => update(() => {
+                p.drones.index = Number(e.target.value);
+              }) },
+              droneIndexes.map((n) => h("option", { value: String(n), selected: p.drones.index === n }, `${n}番目`))
+            )
+          ),
+          orderSelect(p.drones)
+        ),
+        h(
+          "div",
+          {},
+          h("h3", {}, "編集する施設"),
+          h("p", { class: "muted" }, "オフにした施設は、このプランの出力にキーを出しません（MAAの標準アルゴリズムに任せます）。"),
+          h("div", { class: "facility-toggles" }, FACILITIES.map((f) => h(
+            "label",
+            {},
+            h("input", {
+              type: "checkbox",
+              checked: Boolean(p.rooms[f]),
+              onChange: (e) => {
+                const on = e.target.checked;
+                if (!on && p.rooms[f].some((r) => !isRoomEmpty(r)) && !window.confirm(`${FACILITY_LABELS[f]}の配置が削除されます。続けますか？`)) {
+                  e.target.checked = true;
+                  return;
+                }
+                update(() => setFacilityEnabled(p, f, on, state2.project.layout));
+              }
+            }),
+            ` ${FACILITY_LABELS[f]}`
+          )))
+        )
+      );
+    }
+    function orderSelect(obj) {
+      return h(
+        "div",
+        { class: "row" },
+        "実行順 ",
+        h(
+          "select",
+          { "aria-label": "実行順", onChange: (e) => update(() => {
+            obj.order = e.target.value;
+          }) },
+          h("option", { value: "pre", selected: obj.order === "pre" }, "交代の前(pre)"),
+          h("option", { value: "post", selected: obj.order === "post" }, "交代の後(post)")
+        )
+      );
+    }
+    function setPeriod(p, i, side, value) {
+      const current = Array.isArray(p.periods[i]) ? p.periods[i] : ["", ""];
+      const next = [current[0] ?? "", current[1] ?? ""];
+      next[side] = value;
+      p.periods[i] = next;
+    }
+    function refreshSide() {
+      fill(
+        planListEl,
+        state2.project.plans.map((p, i) => h("button", {
+          class: `plan-item${i === state2.selected ? " selected" : ""}`,
+          onClick: () => update(() => {
+            state2.selected = i;
+          })
+        }, p.name || `プラン ${i + 1}`))
+      );
+      const issues = validate(state2.project, nameIndex2, state2.operbox);
+      const errors = issues.filter((x) => x.level === "error").length;
+      const warns = issues.length - errors;
+      fill(
+        validationEl,
+        h(
+          "h2",
+          {},
+          "検証 ",
+          h("span", { class: "badge error" }, `エラー ${errors}`),
+          h("span", { class: "badge warn" }, `警告 ${warns}`)
+        ),
+        issues.length === 0 && h("p", { class: "muted" }, "問題は見つかりませんでした。"),
+        issues.map((issue) => h(
+          "button",
+          { class: `issue ${issue.level}`, onClick: () => jumpTo(issue) },
+          `${issue.level === "error" ? "エラー" : "警告"}: ${issue.message}`
+        ))
+      );
+      const box = state2.operbox;
+      statusEl.textContent = box ? `OperBox: ${box.operators.length}件（所持 ${box.operators.filter((o) => o.own).length}件）` : "OperBox: 未読み込み";
+    }
+    function jumpTo(issue) {
+      if (issue.plan !== null && issue.plan !== void 0) state2.selected = issue.plan;
+      renderAll();
+      if (issue.facility) {
+        const el = root2.querySelector(`[data-room="${state2.selected}-${issue.facility}-${issue.room ?? 0}"]`);
+        if (el) {
+          el.scrollIntoView({ block: "center" });
+          el.classList.add("flash");
+        }
+      }
+    }
+    function topBar() {
+      const project = state2.project;
+      return h(
+        "header",
+        { class: "topbar" },
+        h("button", { onClick: ctx.onLoadOperBox }, "OperBoxを読み込む"),
+        h("button", { onClick: ctx.onImport }, "JSONを取り込む"),
+        h("button", { onClick: ctx.onLayout }, "基地の構成"),
+        h("button", { class: "primary", onClick: ctx.onDownload }, "ダウンロード"),
+        h("button", { onClick: ctx.onCopy }, "コピー"),
+        h("button", { onClick: ctx.onNew }, "新規"),
+        statusEl,
+        h("input", { class: "grow", type: "text", "aria-label": "タイトル", placeholder: "タイトル", value: project.title, onInput: (e) => light(() => {
+          project.title = e.target.value;
+        }) }),
+        h("input", { class: "grow", type: "text", "aria-label": "説明", placeholder: "説明", value: project.description, onInput: (e) => light(() => {
+          project.description = e.target.value;
+        }) })
+      );
+    }
+    function renderAll() {
+      if (state2.selected >= state2.project.plans.length) state2.selected = Math.max(0, state2.project.plans.length - 1);
+      const p = plan();
+      const left = h(
+        "aside",
+        { class: "panel" },
+        h("h2", {}, "プラン"),
+        planListEl,
+        h(
+          "div",
+          { class: "row" },
+          h("button", { onClick: () => update(() => {
+            addPlan(state2.project);
+            state2.selected = state2.project.plans.length - 1;
+          }) }, "追加"),
+          h("button", { disabled: !p, onClick: () => update(() => {
+            duplicatePlan(state2.project, state2.selected);
+            state2.selected += 1;
+          }) }, "複製"),
+          h("button", { "aria-label": "プランを上へ", disabled: !p || state2.selected === 0, onClick: () => update(() => {
+            movePlan(state2.project, state2.selected, -1);
+            state2.selected -= 1;
+          }) }, "↑"),
+          h("button", { "aria-label": "プランを下へ", disabled: !p || state2.selected >= state2.project.plans.length - 1, onClick: () => update(() => {
+            movePlan(state2.project, state2.selected, 1);
+            state2.selected += 1;
+          }) }, "↓"),
+          h("button", {
+            disabled: !p || state2.project.plans.length <= 1,
+            onClick: () => {
+              if (window.confirm(`「${p.name}」を削除しますか？`)) update(() => removePlan(state2.project, state2.selected));
+            }
+          }, "削除")
+        ),
+        p && planForm(p)
+      );
+      const center = h(
+        "main",
+        { class: "stack" },
+        p ? FACILITIES.filter((f) => p.rooms[f]).map((f) => roomCard(f, p.rooms[f], p)) : h("p", { class: "muted" }, "プランがありません"),
+        p && FACILITIES.every((f) => !p.rooms[f]) && h("p", { class: "muted" }, "編集する施設が選ばれていません。左のフォームでオンにしてください。")
+      );
+      const right = h("aside", { class: "panel" }, validationEl);
+      root2.replaceChildren(topBar(), h("div", { class: "layout" }, left, center, right));
+      refreshSide();
+    }
+    return { renderAll, refreshSide };
+  }
+
+  // src/ui/main.js
+  var nameIndex = createNameIndex(JSON.parse(document.getElementById("names").textContent));
+  var dialog = document.getElementById("dialog");
+  var root = document.getElementById("app");
+  var backend = {
+    getItem: (k) => window.localStorage.getItem(k),
+    setItem: (k, v) => window.localStorage.setItem(k, v)
+  };
+  var storage = createStorage(backend);
+  window.addEventListener("pagehide", () => storage.flush());
+  var state = { project: createProject(), operbox: null, selected: 0 };
+  var saved = storage.load();
+  if (saved) {
+    state.project = saved.project;
+    if (saved.operbox) state.operbox = buildOperBox(saved.operbox.operators);
+  }
+  var view = createView(root, {
+    state,
+    nameIndex,
+    changed: () => storage.save(state.project, state.operbox),
+    openPicker: ({ title, taken, onPick }) => openPicker({ dialog, nameIndex, operbox: state.operbox, title, taken, onPick }),
+    onLoadOperBox: () => chooseFile((text) => loadOperBox(text)),
+    onImport: () => chooseFile((text) => loadPlan(text)),
+    onLayout: () => openLayoutDialog({
+      dialog,
+      project: state.project,
+      onApplyPreset: (name) => {
+        applyPreset(state.project, name);
+        touch();
+      },
+      onSetCount: (facility, n) => {
+        setRoomCount(state.project, facility, n);
+        touch();
+      }
+    }),
+    onDownload: () => output((text) => {
+      const blob = new Blob([text], { type: "application/json" });
+      const link = h("a", { href: URL.createObjectURL(blob), download: `${state.project.title || "maa-infra"}.json` });
+      link.click();
+      URL.revokeObjectURL(link.href);
+    }),
+    onCopy: () => output((text) => Promise.resolve().then(() => navigator.clipboard.writeText(text)).then(
+      () => notice("クリップボードにコピーしました。"),
+      () => notice("コピーできませんでした。ダウンロードを使ってください。")
+    )),
+    onNew: () => {
+      if (!window.confirm("現在の編集内容を破棄して新規作成しますか？")) return;
+      state.project = createProject();
+      state.selected = 0;
+      touch();
+    }
+  });
+  function touch() {
+    storage.save(state.project, state.operbox);
+    view.renderAll();
+  }
+  function notice(message) {
+    dialog.replaceChildren(
+      h("p", {}, message),
+      h("div", { class: "dialog-actions" }, h("button", { class: "primary", onClick: () => dialog.close() }, "閉じる"))
+    );
+    dialog.showModal();
+  }
+  function output(write) {
+    const errors = validate(state.project, nameIndex, state.operbox).filter((i) => i.level === "error").length;
+    if (errors > 0 && !window.confirm(
+      `検証エラーが${errors}件あります。時間帯(period)の形式が不正だと、MAAがファイル全体を読み込めません。それでも出力しますか？`
+    )) {
+      return;
+    }
+    write(exportPlan(state.project, nameIndex));
+  }
+  function chooseFile(handler) {
+    const input = h("input", { type: "file", accept: ".json,application/json" });
+    input.addEventListener("change", async () => {
+      const file = input.files[0];
+      if (file) await handler(await file.text());
+    });
+    input.click();
+  }
+  function loadOperBox(text) {
+    try {
+      state.operbox = parseOperBox(text, nameIndex);
+      touch();
+    } catch (e) {
+      notice(`OperBoxを読み込めませんでした: ${e.message}`);
+    }
+  }
+  function loadPlan(text) {
+    let result;
+    try {
+      result = importPlan(text, nameIndex);
+    } catch (e) {
+      notice(`JSONを取り込めませんでした: ${e.message}`);
+      return;
+    }
+    openImportDialog({
+      dialog,
+      report: result.report,
+      onConfirm: () => {
+        state.project = result.project;
+        state.selected = 0;
+        touch();
+      }
+    });
+  }
+  function routeDropped(text) {
+    let data;
+    try {
+      data = JSON.parse(text.replace(/^\uFEFF/, ""));
+    } catch (e) {
+      notice(`JSONとして読めませんでした: ${e.message}`);
+      return;
+    }
+    if (Array.isArray(data)) loadOperBox(text);
+    else if (data && Array.isArray(data.plans)) loadPlan(text);
+    else notice("OperBox でも基地スケジュールでもないJSONです。");
+  }
+  window.addEventListener("dragover", (e) => {
+    e.preventDefault();
+    document.body.classList.add("drop-active");
+  });
+  window.addEventListener("dragleave", (e) => {
+    if (e.target === document.documentElement) document.body.classList.remove("drop-active");
+  });
+  window.addEventListener("drop", async (e) => {
+    e.preventDefault();
+    document.body.classList.remove("drop-active");
+    const file = e.dataTransfer?.files?.[0];
+    if (file) routeDropped(await file.text());
+  });
+  view.renderAll();
+})();
+
+</script>
+</body>
+</html>
