@@ -43,7 +43,17 @@ npm test
 npm run build
 ```
 
-`--source` には、MAAのバージョンとコミットを書きます。N5（日本語名と中国語名の衝突）のテストが失敗したら、一覧を確認して計画に戻って判断します。
+`--source` には、MAAのバージョンとコミットを書きます。
+
+入力はクローンでなく、MAAのインストール先（例: `C:\MAA`）の `resource/battle_data.json` でも構いません（クローンと同じ形式で、`name_jp` を持つことを確認済みです）。コミット番号が分からないので、`--source` にはバージョンとインストール先を書きます。`npm run build` は今の `data/names.json` を埋め込むだけなので、名前表を更新するには上のスクリプトを先に実行します。
+
+```bash
+python -I tools/build_name_table.py "C:/MAA/resource/battle_data.json" --source "MAA v6.20.1 (C:\MAA)"
+npm test
+npm run build
+```
+
+更新したら `data/names.json` と `dist/maa-infra-planner.html` をコミットします。N5（日本語名と中国語名の衝突）のテストが失敗したら、一覧を確認して計画に戻って判断します。
 
 ## 出典
 
