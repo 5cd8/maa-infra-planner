@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import Ajv from "ajv";
 import { importPlan } from "../src/core/importer.js";
+import { validate } from "../src/core/validator.js";
 import { exportPlan } from "../src/core/exporter.js";
 import { createProject } from "../src/core/model.js";
 import { fixture, nameIndex, withoutIds } from "./helpers.js";
@@ -158,4 +159,10 @@ test("X7: 状態の往復", () => {
   plan.rooms.trading[0].product = "LMD";
   const back = imp(exp(s)).project;
   assert.deepEqual(withoutIds(back), withoutIds(s));
+});
+
+test("I8: 要素数が2以外の period はそのまま保持して E4 にする", () => {
+  const { project } = imp(minimal({ period: [["08:00"]] }));
+  assert.deepEqual(project.plans[0].periods, [["08:00"]]);
+  assert.ok(validate(project, nameIndex).some((i) => i.code === "period-format"));
 });

@@ -58,3 +58,20 @@ test("S1: 保存はデバウンスされ最後の内容だけ書く", () => {
   timers.forEach((fn) => fn());
   assert.equal(storage.load().project.title, "b");
 });
+
+test("flush: デバウンス待ちの保存を即時に書き切る", () => {
+  const written = [];
+  const timers = [];
+  const storage = createStorage(
+    { getItem: () => null, setItem: (k, v) => written.push(v) },
+    { setTimer: (fn) => timers.push(fn) - 1, clearTimer: () => {} },
+  );
+  storage.flush();
+  assert.equal(written.length, 0);
+  storage.save(createProject(), null);
+  assert.equal(written.length, 0);
+  storage.flush();
+  assert.equal(written.length, 1);
+  storage.flush();
+  assert.equal(written.length, 1);
+});

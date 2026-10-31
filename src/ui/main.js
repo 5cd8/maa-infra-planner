@@ -21,6 +21,8 @@ const backend = {
 };
 const storage = createStorage(backend);
 
+window.addEventListener("pagehide", () => storage.flush());
+
 const state = { project: createProject(), operbox: null, selected: 0 };
 const saved = storage.load();
 if (saved) {

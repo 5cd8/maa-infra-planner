@@ -4,6 +4,7 @@ const DEBOUNCE_MS = 300;
 
 export function createStorage(backend, { setTimer = setTimeout, clearTimer = clearTimeout } = {}) {
   let timer = null;
+  let pending = null;
 
   function slimOperbox(operbox) {
     if (!operbox) return null;
@@ -37,10 +38,21 @@ export function createStorage(backend, { setTimer = setTimeout, clearTimer = cle
     },
     save(project, operbox) {
       if (timer !== null) clearTimer(timer);
+      pending = { project, operbox };
       timer = setTimer(() => {
         timer = null;
+        pending = null;
         writeNow(project, operbox);
       }, DEBOUNCE_MS);
+    },
+    // タブを閉じる直前など、デバウンス待ちの保存を即時に書き切る
+    flush() {
+      if (timer === null) return;
+      clearTimer(timer);
+      timer = null;
+      const { project, operbox } = pending;
+      pending = null;
+      writeNow(project, operbox);
     },
     saveNow: writeNow,
   };

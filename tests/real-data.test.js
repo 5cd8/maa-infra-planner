@@ -41,7 +41,7 @@ test("実データ: 参考ファイルの取り込みと書き出し", { skip },
         for (const field of ["operators", "candidates", "operatorsA", "operatorsB"]) (room[field] ?? []).forEach((n) => distinct.add(n));
       }
     }
-    distinct.add(plan.fiammetta.target);
+    if (plan.fiammetta.target) distinct.add(plan.fiammetta.target);
   }
   assert.equal(distinct.size, 63);
   assert.equal(report.dropped.filter((d) => d.includes("recycle")).length, original.plans.length + 1);
@@ -56,10 +56,11 @@ test("実データ: 参考ファイルの取り込みと書き出し", { skip },
         assert.deepEqual(out.rooms[facility][r].operators ?? [], room.operators ?? [], `${plan.name} ${facility}${r}`);
       });
     }
-    assert.equal(out.Fiammetta.target, plan.Fiammetta.target);
+    assert.equal(out.Fiammetta?.target, plan.Fiammetta?.target);
+    // プランごとの施設キーの有無が元のまま（回収ステーションは除外される）
+    const keys = (rooms) => Object.keys(rooms).filter((k) => k !== "recycle").sort();
+    assert.deepEqual(keys(out.rooms), keys(plan.rooms), plan.name);
   });
-  assert.equal("processing" in exported.plans[0].rooms, "processing" in original.plans[0].rooms);
-  assert.equal("training" in exported.plans[1].rooms, true);
 
   const box = parseOperBox(readFileSync(operboxPath, "utf8"), nameIndex);
   const notOwned = validate(project, nameIndex, box).filter((i) => i.code === "not-owned");

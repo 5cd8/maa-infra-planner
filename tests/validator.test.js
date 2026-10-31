@@ -95,6 +95,15 @@ test("V8 W1: 未所持。OperBox未読み込みでは出ない", () => {
   assert.match(found[0].message, /チェン/);
 });
 
+test("V8b W1: candidates・訓練室の operatorsA/B も対象", () => {
+  const p = createProject();
+  p.plans[0].rooms.manufacture[0].candidates = ["チェン"];
+  p.plans[0].rooms.training = [{ operatorsA: ["チェン"], operatorsB: [] }];
+  const owned = box(["char_003_kalts", "ケルシー", true], ["char_010_chen", "チェン", false]);
+  const found = validate(p, nameIndex, owned).filter((i) => i.code === "not-owned");
+  assert.equal(found.length, 2);
+});
+
 test("V9 W2: 未解決名には W1 を出さない", () => {
   const p = createProject();
   p.plans[0].rooms.control[0].operators = ["不明な人"];
