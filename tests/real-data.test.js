@@ -32,7 +32,7 @@ test("実データ: 参考ファイルの取り込みと書き出し", { skip },
   const original = JSON.parse(text.replace(/^\uFEFF/, ""));
   const { project, report } = importPlan(text, nameIndex);
   assert.deepEqual(report.unresolved, []);
-  // 回収ステーションを除く63名（Fiammetta.target を含む、延べ件数）
+  // 回収ステーションを除く名前の延べ件数（Fiammetta.target を含む）
   assert.equal(report.converted, countNames(original));
   const distinct = new Set();
   for (const plan of project.plans) {
@@ -43,8 +43,21 @@ test("実データ: 参考ファイルの取り込みと書き出し", { skip },
     }
     if (plan.fiammetta.target) distinct.add(plan.fiammetta.target);
   }
-  assert.equal(distinct.size, 63);
-  assert.equal(report.dropped.filter((d) => d.includes("recycle")).length, original.plans.length + 1);
+  // 参考ファイルごとに変わる値は、元のJSONから数える
+  const originalDistinct = new Set();
+  for (const plan of original.plans) {
+    for (const [facility, rooms] of Object.entries(plan.rooms)) {
+      if (facility === "recycle") continue;
+      for (const room of rooms) {
+        for (const field of ["operators", "candidates", "operatorsA", "operatorsB"]) (room[field] ?? []).forEach((n) => originalDistinct.add(n));
+      }
+    }
+    if (plan.Fiammetta?.target) originalDistinct.add(plan.Fiammetta.target);
+  }
+  assert.equal(distinct.size, originalDistinct.size);
+  const recycleDrops = original.plans.filter((p) => p.rooms.recycle).length
+    + ((original.layout ?? []).some((l) => l.type === "recycle") ? 1 : 0);
+  assert.equal(report.dropped.filter((d) => d.includes("recycle")).length, recycleDrops);
 
   const exported = JSON.parse(exportPlan(project, nameIndex));
   assert.ok(validateSchema(exported), JSON.stringify(validateSchema.errors));

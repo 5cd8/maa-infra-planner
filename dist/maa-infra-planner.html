@@ -1430,7 +1430,7 @@ dialog::backdrop { background: rgba(0, 0, 0, 0.45); }
   }
 
   // src/ui/render.js
-  var ROOM_FIELD_LABELS = { operators: "配置", candidates: "候補", operatorsA: "訓練するオペレーター A", operatorsB: "訓練するオペレーター B" };
+  var ROOM_FIELD_LABELS = { operators: "配置", candidates: "候補", operatorsA: "協力者（訓練時間を短縮する資質を持つオペレーター）", operatorsB: "訓練するオペレーター" };
   function createView(root2, ctx) {
     const { state: state2, nameIndex: nameIndex2 } = ctx;
     const planListEl = h("div", { id: "planList" });
@@ -1498,7 +1498,7 @@ dialog::backdrop { background: rgba(0, 0, 0, 0.45); }
     function roomCard(facility, rooms, p) {
       const cards = rooms.map((room, r) => {
         const training = facility === "training";
-        const fields = training ? ["operatorsA", "operatorsB"] : ["operators"];
+        const fields = training ? ["operatorsB", "operatorsA"] : ["operators"];
         return h(
           "div",
           { class: "room", "data-room": `${state2.selected}-${facility}-${r}` },
@@ -1507,7 +1507,7 @@ dialog::backdrop { background: rgba(0, 0, 0, 0.45); }
             "div",
             {},
             h("div", { class: "muted" }, ROOM_FIELD_LABELS[field]),
-            chipList(room[field], { title: `${FACILITY_LABELS[facility]}${rooms.length > 1 ? ` ${r + 1}` : ""}に追加`, p })
+            chipList(room[field], { title: `${FACILITY_LABELS[facility]}${rooms.length > 1 ? ` ${r + 1}` : ""}の${training ? ROOM_FIELD_LABELS[field].replace(/（.*）/, "") : ""}に追加`, p })
           )),
           h(
             "div",

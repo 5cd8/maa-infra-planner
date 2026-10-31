@@ -5,7 +5,7 @@ import {
 import { validate } from "../core/validator.js";
 import { fill, h } from "./dom.js";
 
-const ROOM_FIELD_LABELS = { operators: "配置", candidates: "候補", operatorsA: "訓練するオペレーター A", operatorsB: "訓練するオペレーター B" };
+const ROOM_FIELD_LABELS = { operators: "配置", candidates: "候補", operatorsA: "協力者（訓練時間を短縮する資質を持つオペレーター）", operatorsB: "訓練するオペレーター" };
 
 // root: #app。ctx は main.js が渡す（state・名前表・ファイル操作のコールバック）
 export function createView(root, ctx) {
@@ -64,11 +64,11 @@ export function createView(root, ctx) {
   function roomCard(facility, rooms, p) {
     const cards = rooms.map((room, r) => {
       const training = facility === "training";
-      const fields = training ? ["operatorsA", "operatorsB"] : ["operators"];
+      const fields = training ? ["operatorsB", "operatorsA"] : ["operators"];
       return h("div", { class: "room", "data-room": `${state.selected}-${facility}-${r}` },
         rooms.length > 1 && h("h3", {}, `${FACILITY_LABELS[facility]} ${r + 1}`),
         fields.map((field) => h("div", {}, h("div", { class: "muted" }, ROOM_FIELD_LABELS[field]),
-          chipList(room[field], { title: `${FACILITY_LABELS[facility]}${rooms.length > 1 ? ` ${r + 1}` : ""}に追加`, p }))),
+          chipList(room[field], { title: `${FACILITY_LABELS[facility]}${rooms.length > 1 ? ` ${r + 1}` : ""}の${training ? ROOM_FIELD_LABELS[field].replace(/（.*）/, "") : ""}に追加`, p }))),
         h("div", { class: "checks" },
           !training && check("並べ替え(sort)", room, "sort"),
           check("変更しない(skip)", room, "skip"),
