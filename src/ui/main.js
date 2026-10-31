@@ -48,9 +48,11 @@ const view = createView(root, {
     link.click();
     URL.revokeObjectURL(link.href);
   }),
-  onCopy: () => output((text) => navigator.clipboard.writeText(text).then(
-    () => notice("クリップボードにコピーしました。"),
-    () => notice("コピーできませんでした。ダウンロードを使ってください。"))),
+  onCopy: () => output((text) => Promise.resolve()
+    .then(() => navigator.clipboard.writeText(text))
+    .then(
+      () => notice("クリップボードにコピーしました。"),
+      () => notice("コピーできませんでした。ダウンロードを使ってください。"))),
   onNew: () => {
     if (!window.confirm("現在の編集内容を破棄して新規作成しますか？")) return;
     state.project = createProject();

@@ -96,6 +96,33 @@ export function importPlan(text, nameIndex) {
     plans: [],
   };
 
+  function readRoom(fac, room, planName) {
+    const out = createRoom(fac);
+    if (fac === "training") {
+      if (room && typeof room === "object") {
+        out.skip = room.skip === true;
+        out.operatorsA = convertNames(room.operatorsA);
+        out.operatorsB = convertNames(room.operatorsB);
+      }
+      return out;
+    }
+    // 不足分は「配置の意思なし」の部屋にする（既定値のsort・autofillを使わない）
+    out.sort = false;
+    out.autofill = false;
+    if (!room || typeof room !== "object") return out;
+    if (room.use_operator_groups === true) {
+      drop(planName, fac, "use_operator_groups: オペレーターグループは未対応のため除外");
+    } else {
+      out.operators = convertNames(room.operators);
+    }
+    out.candidates = convertNames(room.candidates);
+    out.sort = room.sort === true;
+    out.skip = room.skip === true;
+    out.autofill = room.autofill === true;
+    if ("product" in out) out.product = typeof room.product === "string" ? room.product : "";
+    return out;
+  }
+
   data.plans.forEach((src, index) => {
     const plan = createPlan(layout);
     plan.rooms = {};
@@ -150,36 +177,9 @@ export function importPlan(text, nameIndex) {
       const count = facility === "dormitory" ? DORMITORY_COUNT
         : VARIABLE_FACILITIES.includes(facility) ? layout[facility] : 1;
       if (list.length > count) drop(planName, facility, `部屋数(${count})を超えた分を切り詰め`);
-      plan.rooms[facility] = Array.from({ length: count }, (_, i) => readRoom(facility, list[i]));
+      plan.rooms[facility] = Array.from({ length: count }, (_, i) => readRoom(facility, list[i], planName));
     }
     project.plans.push(plan);
-
-    function readRoom(fac, room) {
-      const out = createRoom(fac);
-      if (fac === "training") {
-        if (room && typeof room === "object") {
-          out.skip = room.skip === true;
-          out.operatorsA = convertNames(room.operatorsA);
-          out.operatorsB = convertNames(room.operatorsB);
-        }
-        return out;
-      }
-      // 不足分は「配置の意思なし」の部屋にする（既定値のsort・autofillを使わない）
-      out.sort = false;
-      out.autofill = false;
-      if (!room || typeof room !== "object") return out;
-      if (room.use_operator_groups === true) {
-        drop(planName, fac, "use_operator_groups: オペレーターグループは未対応のため除外");
-      } else {
-        out.operators = convertNames(room.operators);
-      }
-      out.candidates = convertNames(room.candidates);
-      out.sort = room.sort === true;
-      out.skip = room.skip === true;
-      out.autofill = room.autofill === true;
-      if ("product" in out) out.product = typeof room.product === "string" ? room.product : "";
-      return out;
-    }
   });
 
   return { project, report };

@@ -1,7 +1,7 @@
 // Schema の pattern と同じ
-export const TIME_PATTERN = /^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/;
+const TIME_PATTERN = /^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/;
 
-export function isValidTime(value) {
+function isValidTime(value) {
   return typeof value === "string" && TIME_PATTERN.test(value);
 }
 

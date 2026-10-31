@@ -2,7 +2,7 @@ import { isOwned } from "../core/operbox.js";
 import { h } from "./dom.js";
 
 // 選択肢は名前表の日本語名とOperBoxの和集合。OperBoxの昇進・レベル・レアリティで上書きする
-export function buildChoices(nameIndex, operbox) {
+function buildChoices(nameIndex, operbox) {
   const byName = new Map();
   for (const e of nameIndex.entries()) {
     if (e.jpAvailable && !byName.has(e.nameJp)) {
